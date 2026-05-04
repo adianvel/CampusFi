@@ -1,0 +1,19 @@
+[toolchain]
+package_manager = "npm"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+campusfi = "6bdF5nkmYRNJEvHFbhkH2hDcDAFF43BVHj89jRu7cKJG"
+
+[programs.devnet]
+campusfi = "6bdF5nkmYRNJEvHFbhkH2hDcDAFF43BVHj89jRu7cKJG"
+
+[provider]
+cluster = "localnet"
+wallet = ".anchor/test-wallet.json"
+
+[scripts]
+test = "\"/mnt/c/Program Files/nodejs/node.exe\" --test tests/campusfi.test.js"
