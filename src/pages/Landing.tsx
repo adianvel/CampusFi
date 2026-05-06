@@ -33,7 +33,7 @@ export function Landing() {
               <a href="#students" className="text-sm font-medium text-white/80 hover:text-white transition-colors">For Students</a>
               <a href="#lenders" className="text-sm font-medium text-white/80 hover:text-white transition-colors">For Lenders</a>
               <a href="#about" className="text-sm font-medium text-white/80 hover:text-white transition-colors">About</a>
-              <Link to="/app" className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-[4px] text-sm font-medium transition-colors border border-blue-500/50">
+              <Link to="/onboarding" className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-[4px] text-sm font-medium transition-colors border border-blue-500/50">
                 Get Started
               </Link>
             </div>
@@ -63,7 +63,7 @@ export function Landing() {
                 CampusFi backs ambition with capital, community, and confidence.
               </p>
               <div className="flex flex-col sm:flex-row items-center gap-6">
-                <Link to="/app" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 hover:-translate-y-1 text-white px-8 py-4 rounded-[4px] text-lg font-medium transition-all duration-300 text-center border border-blue-500/50">
+                <Link to="/onboarding" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 hover:-translate-y-1 text-white px-8 py-4 rounded-[4px] text-lg font-medium transition-all duration-300 text-center border border-blue-500/50">
                   Explore Loans
                 </Link>
                 <a href="#how-it-works" className="flex items-center justify-center gap-2 text-white font-medium hover:text-blue-400 hover:translate-x-1 transition-all duration-300">
@@ -416,10 +416,10 @@ export function Landing() {
                    Join CampusFi and be part of the future of education finance.
                  </p>
                  <div className="flex flex-col sm:flex-row gap-4">
-                    <Link to="/app" className="bg-blue-600 hover:bg-blue-500 hover:-translate-y-1 text-white px-8 py-4 rounded-[4px] text-lg font-medium transition-all duration-300 text-center border border-blue-500/50">
+                    <Link to="/onboarding?role=student" className="bg-blue-600 hover:bg-blue-500 hover:-translate-y-1 text-white px-8 py-4 rounded-[4px] text-lg font-medium transition-all duration-300 text-center border border-blue-500/50">
                       I'm a Student
                     </Link>
-                    <Link to="/app" className="bg-white border border-slate-200 hover:border-slate-300 hover:-translate-y-1 text-slate-900 px-8 py-4 rounded-[4px] text-lg font-medium transition-all duration-300 text-center">
+                    <Link to="/onboarding?role=lender" className="bg-white border border-slate-200 hover:border-slate-300 hover:-translate-y-1 text-slate-900 px-8 py-4 rounded-[4px] text-lg font-medium transition-all duration-300 text-center">
                       I'm a Lender
                     </Link>
                  </div>

@@ -3,15 +3,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import { Landing } from "./pages/Landing";
-import { AppDashboard } from "./pages/AppDashboard";
+import { Onboarding } from "./pages/Onboarding";
+
+const AppDashboard = lazy(() =>
+  import("./pages/AppDashboard").then((module) => ({ default: module.AppDashboard })),
+);
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/app/*" element={<AppDashboard />} />
+      <Route path="/onboarding" element={<Onboarding />} />
+      <Route
+        path="/app/*"
+        element={
+          <Suspense fallback={<div className="min-h-screen bg-[#E5E7EB]" />}>
+            <AppDashboard />
+          </Suspense>
+        }
+      />
     </Routes>
   );
 }

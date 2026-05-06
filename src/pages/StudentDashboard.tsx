@@ -1,195 +1,566 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/src/components/ui/Card";
-import { Badge } from "@/src/components/ui/Badge";
-import { Button } from "@/src/components/ui/Button";
-import { CheckCircle2, AlertCircle, TrendingUp, Clock, FileText, ArrowRight } from "lucide-react";
+import { type FormEvent, type ReactNode, useMemo, useState } from "react";
+import { AlertCircle, CheckCircle2, FileText, Loader2, RefreshCw, ShieldCheck, Upload } from "lucide-react";
+import { Alert, AlertDescription } from "@/src/components/ui/alert";
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { Input } from "@/src/components/ui/input";
+import { Label } from "@/src/components/ui/label";
+import { Progress } from "@/src/components/ui/progress";
+import { Skeleton } from "@/src/components/ui/skeleton";
+import { useCampusfi } from "@/src/hooks/useCampusfi";
+import { formatUsdc, getLoanStatus, getRiskTier, totalOwed } from "@/src/lib/campusfiClient";
+import {
+  loadStudentVerification,
+  saveStudentVerification,
+  type StudentVerification,
+  verifyStudentCredential,
+} from "@/src/lib/studentVerification";
 
 export function StudentDashboard({ showProfile = false }: { showProfile?: boolean }) {
-  const [loanStatus, setLoanStatus] = useState<"none" | "requested" | "active">("none");
+  const {
+    connected,
+    publicKey,
+    loading,
+    actionPending,
+    error,
+    studentProfile,
+    studentLoans,
+    registerStudent,
+    createLoanRequest,
+    repayLoan,
+    refresh,
+  } = useCampusfi();
+  const [profileForm, setProfileForm] = useState({
+    name: "Rizki Ananda",
+    university: "Universitas Indonesia",
+  });
+  const [loanForm, setLoanForm] = useState({
+    amount: 150,
+    purpose: "Laptop Upgrade Fund",
+    termMonths: 3,
+    interestRateBps: 120,
+  });
+  const [repayAmount, setRepayAmount] = useState(51.8);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [verification, setVerification] = useState<StudentVerification | null>(() => loadStudentVerification());
+  const [verificationEmail, setVerificationEmail] = useState("student@ui.ac.id");
+  const [ktmFile, setKtmFile] = useState<File | null>(null);
+  const [verificationPending, setVerificationPending] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+
+  const activeLoan = useMemo(() => studentLoans[0] ?? null, [studentLoans]);
+  const reputationScore = studentProfile ? Math.round(studentProfile.reputationScore / 10) : 0;
+
+  async function runAction(action: () => Promise<void>) {
+    setFormError(null);
+    try {
+      await action();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Transaction failed");
+    }
+  }
+
+  async function handleStudentVerification(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setVerificationError(null);
+
+    if (!ktmFile) {
+      setVerificationError("Upload your KTM card before continuing.");
+      return;
+    }
+
+    setVerificationPending(true);
+    try {
+      const result = await verifyStudentCredential(verificationEmail, ktmFile, publicKey?.toBase58() ?? "");
+      saveStudentVerification(result);
+      setVerification(result);
+      setProfileForm((current) => ({
+        ...current,
+        university: current.university || result.universityDomain.replace(".ac.id", "").toUpperCase(),
+      }));
+    } catch (err) {
+      setVerificationError(err instanceof Error ? err.message : "Student verification failed.");
+    } finally {
+      setVerificationPending(false);
+    }
+  }
+
+  if (!connected) {
+    return (
+      <Card className="mx-auto max-w-3xl border-primary/20 bg-card shadow-sm">
+        <CardContent className="grid gap-8 p-8 md:grid-cols-[1fr_220px] md:items-center">
+          <div>
+            <Badge variant="secondary" className="mb-4">Borrower setup</Badge>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Connect your Solana wallet</h1>
+            <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+              CampusFi links your verified student identity, reputation score, and loan accounts to one wallet.
+            </p>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border bg-background p-4">
+                <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">Step 01</div>
+                <div className="mt-1 text-sm font-semibold">Connect wallet</div>
+              </div>
+              <div className="rounded-xl border bg-background p-4">
+                <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">Step 02</div>
+                <div className="mt-1 text-sm font-semibold">Verify student email</div>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl border bg-primary/5 p-6 text-center">
+            <FileText className="mx-auto h-12 w-12 text-primary" />
+            <div className="mt-4 text-sm font-semibold">No wallet connected</div>
+            <div className="mt-1 text-xs text-muted-foreground">Use the button in the top bar.</div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (showProfile) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="mb-8">
-           <h1 className="text-3xl font-serif italic text-white">Reputation Profile</h1>
-           <p className="text-white/50 font-light">Your verified on-chain credentials.</p>
+      <div className="mx-auto max-w-4xl space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold text-[#111827]">Reputation Profile</h1>
+            <p className="text-slate-500">On-chain student profile and reputation snapshot.</p>
+          </div>
+          <Button variant="outline" onClick={refresh}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
-           <Card className="md:col-span-1 border-[#00FFA3]/20 bg-[#00FFA3]/5">
+        {!verification ? (
+          <StudentVerificationCard
+            email={verificationEmail}
+            setEmail={setVerificationEmail}
+            ktmFile={ktmFile}
+            setKtmFile={setKtmFile}
+            pending={verificationPending}
+            error={verificationError}
+            onSubmit={handleStudentVerification}
+          />
+        ) : !studentProfile ? (
+          <div className="space-y-4">
+            <VerificationSummary verification={verification} />
+            <RegisterStudentCard
+              profileForm={profileForm}
+              setProfileForm={setProfileForm}
+              pending={actionPending}
+              onSubmit={() => runAction(() => registerStudent(profileForm.name, profileForm.university))}
+            />
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-3">
+            <Card className="border-[#3B82F6]/20 bg-[#3B82F6]/5">
               <CardHeader>
-                 <CardTitle className="text-[#00FFA3]">Score</CardTitle>
+                <CardTitle className="text-[#3B82F6]">Score</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center justify-center py-6">
-                 <div className="text-6xl font-serif italic text-[#00FFA3] mb-2">85</div>
-                 <Badge variant="success">Low Risk Tier</Badge>
+                <div className="mb-2 text-6xl font-semibold text-[#3B82F6]">
+                  {reputationScore}
+                </div>
+                <Badge variant={reputationScore >= 75 ? "success" : "warning"}>
+                  {reputationScore >= 75 ? "Low Risk Tier" : "Medium Risk Tier"}
+                </Badge>
               </CardContent>
-           </Card>
+            </Card>
 
-           <Card className="md:col-span-2">
+            <Card className="md:col-span-2">
               <CardHeader>
-                 <CardTitle>Verification Vectors</CardTitle>
+                <CardTitle>{studentProfile.name}</CardTitle>
+                <CardDescription>{studentProfile.university}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                 {[
-                   { label: "Identity (KTM & Email)", status: "Verified", certs: "UI, .ac.id", color: "text-[#00FFA3]" },
-                   { label: "Academic Standings", status: "Verified", certs: "GPA > 3.5", color: "text-[#00FFA3]" },
-                   { label: "Portfolio / Github", status: "Verified", certs: "14 repos, 2 hackathons", color: "text-[#00FFA3]" },
-                   { label: "Repayment History", status: "Pending", certs: "No past loans yet", color: "text-white/40" },
-                 ].map((v, i) => (
-                   <div key={i} className="flex justify-between items-center p-3 border border-white/10 rounded-sm bg-white/5">
-                      <div className="flex items-center gap-3">
-                         {v.status === "Verified" ? <CheckCircle2 className={`h-4 w-4 ${v.color}`} /> : <AlertCircle className={`h-4 w-4 ${v.color}`} />}
-                         <span className="font-light text-sm text-white/90">{v.label}</span>
-                      </div>
-                      <div className="text-right">
-                         <div className="text-[10px] font-mono tracking-widest uppercase text-white/50">{v.status}</div>
-                         <div className="text-sm text-white/80">{v.certs}</div>
-                      </div>
-                   </div>
-                 ))}
-                 
-                 <Button variant="outline" className="w-full mt-4">Connect More Accounts</Button>
+              <CardContent className="space-y-3">
+                {[
+                  ["Identity profile", studentProfile.identityVerified ? "Verified" : "Profile created"],
+                  ["Loans created", String(studentProfile.loansCount)],
+                  ["Wallet authority", studentProfile.authority.toBase58().slice(0, 8) + "..."],
+                  ["Repayment history", studentLoans.length ? "On-chain loan found" : "No repayment history yet"],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between rounded-sm border border-slate-200 bg-white p-3">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="h-4 w-4 text-[#3B82F6]" />
+                      <span className="text-sm text-slate-800">{label}</span>
+                    </div>
+                    <span className="font-mono text-xs text-slate-500">{value}</span>
+                  </div>
+                ))}
               </CardContent>
-           </Card>
-        </div>
+            </Card>
+          </div>
+        )}
+
+        {(error || formError) && <InlineError message={error || formError || ""} />}
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="mb-8">
-         <h1 className="text-3xl font-serif italic text-white">Loan Overview</h1>
-         <p className="text-white/50 font-light">Manage your active education loans.</p>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold text-[#111827]">Loan Overview</h1>
+          <p className="text-slate-500">Create and repay education loans from your wallet.</p>
+        </div>
+        <Button variant="outline" onClick={refresh}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Refresh
+        </Button>
       </div>
 
-      {loanStatus === "none" && (
-         <Card className="border-dashed border-2 bg-white/5">
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-               <FileText className="h-10 w-10 text-white/30 mb-4" />
-               <h3 className="text-xl font-serif italic text-white mb-2">No active loans</h3>
-               <p className="text-white/50 max-w-sm mb-6 font-light">Your reputation score allows you to borrow up to $300 at a 1.2% monthly rate.</p>
-               <Button onClick={() => setLoanStatus("requested")}>Request First Loan</Button>
-            </CardContent>
-         </Card>
-      )}
-
-      {loanStatus === "requested" && (
-         <Card>
-            <CardHeader className="bg-yellow-500/10 border-b border-white/10 rounded-t-lg">
-               <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-yellow-500">Laptop Upgrade Fund</CardTitle>
-                    <CardDescription className="text-yellow-500/60">Requested 2 hours ago</CardDescription>
-                  </div>
-                  <Badge variant="warning">Funding</Badge>
-               </div>
+      {!verification ? (
+        <StudentVerificationCard
+          email={verificationEmail}
+          setEmail={setVerificationEmail}
+          ktmFile={ktmFile}
+          setKtmFile={setKtmFile}
+          pending={verificationPending}
+          error={verificationError}
+          onSubmit={handleStudentVerification}
+        />
+      ) : !studentProfile ? (
+        <div className="space-y-4">
+          <VerificationSummary verification={verification} />
+          <RegisterStudentCard
+            profileForm={profileForm}
+            setProfileForm={setProfileForm}
+            pending={actionPending}
+            onSubmit={() => runAction(() => registerStudent(profileForm.name, profileForm.university))}
+          />
+        </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+          <Card>
+            <CardHeader>
+              <CardTitle>Create Loan Request</CardTitle>
+              <CardDescription>Stored on Solana as a CampusFi loan account.</CardDescription>
             </CardHeader>
-            <CardContent className="pt-6 space-y-6">
-               <div>
-                  <div className="flex justify-between text-[11px] uppercase tracking-widest font-mono text-white mb-2">
-                     <span className="text-[#00FFA3]">$90 Funded</span>
-                     <span className="text-white/50">Target: $150</span>
-                  </div>
-                  <div className="h-1 bg-white/10 w-full">
-                     <div className="h-full bg-[#00FFA3] w-[60%]" />
-                  </div>
-               </div>
-               
-               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-white/5 p-4 rounded-sm border border-white/10">
-                     <span className="block text-[9px] uppercase tracking-widest text-white/40 mb-1">Term</span>
-                     <span className="font-mono text-sm text-white">3 Months</span>
-                  </div>
-                  <div className="bg-white/5 p-4 rounded-sm border border-white/10">
-                     <span className="block text-[9px] uppercase tracking-widest text-white/40 mb-1">Interest</span>
-                     <span className="font-mono text-sm text-white">1.2% / mo</span>
-                  </div>
-                  <div className="bg-white/5 p-4 rounded-sm border border-white/10">
-                     <span className="block text-[9px] uppercase tracking-widest text-white/40 mb-1">Lenders</span>
-                     <span className="font-mono text-sm text-white">2</span>
-                  </div>
-                  <div className="bg-white/5 p-4 rounded-sm border border-white/10">
-                     <span className="block text-[9px] uppercase tracking-widest text-white/40 mb-1">Est. Payment</span>
-                     <span className="font-mono text-sm text-[#00FFA3]">$51.80 / mo</span>
-                  </div>
-               </div>
+            <CardContent className="space-y-4">
+              <Field label="Purpose">
+                <Input
+                  value={loanForm.purpose}
+                  onChange={(event) => setLoanForm({ ...loanForm, purpose: event.target.value })}
+                  className="h-10"
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Amount USDC">
+                  <Input
+                    type="number"
+                    min={50}
+                    max={300}
+                    value={loanForm.amount}
+                    onChange={(event) => setLoanForm({ ...loanForm, amount: Number(event.target.value) })}
+                    className="h-10"
+                  />
+                </Field>
+                <Field label="Term">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={6}
+                    value={loanForm.termMonths}
+                    onChange={(event) => setLoanForm({ ...loanForm, termMonths: Number(event.target.value) })}
+                    className="h-10"
+                  />
+                </Field>
+                <Field label="Monthly bps">
+                  <Input
+                    type="number"
+                    min={60}
+                    max={400}
+                    value={loanForm.interestRateBps}
+                    onChange={(event) => setLoanForm({ ...loanForm, interestRateBps: Number(event.target.value) })}
+                    className="h-10"
+                  />
+                </Field>
+              </div>
+              <Button
+                className="w-full"
+                disabled={Boolean(actionPending)}
+                onClick={() => runAction(() => createLoanRequest(loanForm))}
+              >
+                {actionPending === "Creating loan request" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create On-Chain Loan
+              </Button>
             </CardContent>
-            <CardFooter className="bg-black/20 border-t border-white/10 justify-end rounded-b-lg">
-               {/* Mock action for demo */}
-               <Button variant="outline" className="mr-2 border-white/20 text-white/70">Cancel Request</Button>
-               <Button onClick={() => setLoanStatus("active")} className="bg-[#00FFA3] text-black">Simulate Fully Funded</Button>
-            </CardFooter>
-         </Card>
+          </Card>
+
+          <LoanCard
+            loan={activeLoan}
+            loading={loading}
+            repayAmount={repayAmount}
+            setRepayAmount={setRepayAmount}
+            onRepay={() => activeLoan && runAction(() => repayLoan(activeLoan, repayAmount))}
+            pending={actionPending}
+          />
+        </div>
       )}
 
-      {loanStatus === "active" && (
-         <div className="space-y-6">
-           <Card className="border-[#00FFA3]/30 bg-[#00FFA3]/5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4">
-                <Badge variant="success">Active</Badge>
-              </div>
-              <CardHeader className="bg-[#00FFA3]/10 border-b border-[#00FFA3]/20">
-                <CardTitle className="text-xl text-[#00FFA3]">Laptop Upgrade Fund</CardTitle>
-                <CardDescription className="text-[#00FFA3]/60">Escrow fully disbursed to your wallet.</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6">
-                 <div className="grid md:grid-cols-2 gap-8">
-                    <div>
-                       <div className="text-4xl font-serif italic text-white mb-1">$51.80</div>
-                       <div className="text-[10px] text-white/50 tracking-widest uppercase font-mono mb-6">Next Payment Due in 14 days</div>
-                       
-                       <Button className="w-full bg-[#00FFA3] text-black hover:bg-white transition-colors">Pay Installment 1/3</Button>
-                    </div>
-                    
-                    <div className="space-y-4 font-mono text-xs">
-                       <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                          <span className="text-white/40 uppercase tracking-widest">Principal Remaining</span>
-                          <span className="text-white">$150.00</span>
-                       </div>
-                       <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                          <span className="text-white/40 uppercase tracking-widest">Interest Accrued</span>
-                          <span className="text-white">$1.80</span>
-                       </div>
-                       <div className="flex justify-between items-center">
-                          <span className="text-white/40 uppercase tracking-widest">Credit Passport Impact</span>
-                          <span className="text-[#00FFA3] flex items-center gap-1">+10 pts <TrendingUp className="h-3 w-3" /></span>
-                       </div>
-                    </div>
-                 </div>
-              </CardContent>
-           </Card>
-           
-           <h3 className="font-serif italic text-xl pt-4 text-white">Repayment Schedule</h3>
-           <Card className="overflow-hidden border-white/10">
-              <CardContent className="p-0">
-                 <div className="divide-y divide-white/10">
-                    {[
-                      { num: 1, due: "Aug 15, 2026", amount: "$51.80", status: "Upcoming", action: true },
-                      { num: 2, due: "Sep 15, 2026", amount: "$51.80", status: "Locked", action: false },
-                      { num: 3, due: "Oct 15, 2026", amount: "$51.80", status: "Locked", action: false },
-                    ].map((row, i) => (
-                      <div key={i} className={`p-4 flex items-center justify-between ${row.status === "Upcoming" ? "bg-white/5" : "bg-transparent opacity-50"}`}>
-                         <div className="flex items-center gap-4">
-                            <div className={`h-8 w-8 rounded-sm flex items-center justify-center font-mono text-[10px] ${row.status === "Upcoming" ? "bg-[#00FFA3] text-black" : "bg-white/10 text-white flex items-center justify-center"}`}>
-                               0{row.num}
-                            </div>
-                            <div>
-                               <div className="font-serif italic text-white">{row.due}</div>
-                               <div className="text-[10px] font-mono tracking-widest uppercase text-[#00FFA3]">{row.status}</div>
-                            </div>
-                         </div>
-                         <div className="text-right">
-                            <div className="font-mono text-sm text-white">{row.amount}</div>
-                         </div>
-                      </div>
-                    ))}
-                 </div>
-              </CardContent>
-           </Card>
-         </div>
-      )}
+      {(error || formError) && <InlineError message={error || formError || ""} />}
     </div>
+  );
+}
+
+function StudentVerificationCard({
+  email,
+  setEmail,
+  ktmFile,
+  setKtmFile,
+  pending,
+  error,
+  onSubmit,
+}: {
+  email: string;
+  setEmail: (value: string) => void;
+  ktmFile: File | null;
+  setKtmFile: (value: File | null) => void;
+  pending: boolean;
+  error: string | null;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-blue-50 text-[#2563EB]">
+            <ShieldCheck className="h-5 w-5" aria-hidden />
+          </div>
+          <div>
+            <CardTitle>Verify Student Status</CardTitle>
+            <CardDescription>
+              Confirm your campus email and KTM before creating an on-chain borrower profile.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <form className="space-y-4" onSubmit={onSubmit}>
+          <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+            <Field label="Student email">
+              <Input
+                type="email"
+                autoComplete="email"
+                spellCheck={false}
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="h-10"
+                placeholder="name@university.ac.id"
+                aria-invalid={error ? "true" : undefined}
+              />
+            </Field>
+            <Field label="KTM document">
+              <label className="flex h-10 cursor-pointer items-center justify-between gap-3 rounded-sm border border-slate-300 bg-white px-3 text-sm text-slate-600 focus-within:ring-2 focus-within:ring-[#3B82F6] focus-within:ring-offset-2">
+                <span className="truncate">{ktmFile ? ktmFile.name : "Upload image or PDF"}</span>
+                <Upload className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="sr-only"
+                  onChange={(event) => setKtmFile(event.target.files?.[0] ?? null)}
+                />
+              </label>
+            </Field>
+            <Button type="submit" disabled={pending} aria-busy={pending}>
+              {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
+              Verify
+            </Button>
+          </div>
+          <p className="text-xs text-slate-500">
+            PaddleOCR reads the KTM server-side; CampusFi stores only a verification result and credential hash.
+          </p>
+          {error && <InlineError message={error} />}
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function VerificationSummary({ verification }: { verification: StudentVerification }) {
+  return (
+    <Card className="border-[#3B82F6]/20 bg-blue-50">
+      <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5 text-[#2563EB]" aria-hidden />
+          <div>
+            <p className="text-sm font-semibold text-[#111827]">Student verification complete</p>
+            <p className="text-xs text-slate-500">
+              {verification.email} / {verification.ktmFileName}
+            </p>
+          </div>
+        </div>
+        <Badge variant="success">Verified</Badge>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RegisterStudentCard({
+  profileForm,
+  setProfileForm,
+  pending,
+  onSubmit,
+}: {
+  profileForm: { name: string; university: string };
+  setProfileForm: (value: { name: string; university: string }) => void;
+  pending: string | null;
+  onSubmit: () => void;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Register Student Profile</CardTitle>
+        <CardDescription>Create your on-chain borrower identity first.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+        <Field label="Name">
+          <Input
+            value={profileForm.name}
+            onChange={(event) => setProfileForm({ ...profileForm, name: event.target.value })}
+            className="h-10"
+          />
+        </Field>
+        <Field label="University">
+          <Input
+            value={profileForm.university}
+            onChange={(event) => setProfileForm({ ...profileForm, university: event.target.value })}
+            className="h-10"
+          />
+        </Field>
+        <Button disabled={Boolean(pending)} onClick={onSubmit}>
+          {pending === "Registering student profile" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Register
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function LoanCard({
+  loan,
+  loading,
+  repayAmount,
+  setRepayAmount,
+  onRepay,
+  pending,
+}: {
+  loan: ReturnType<typeof useCampusfi>["studentLoans"][number] | null;
+  loading: boolean;
+  repayAmount: number;
+  setRepayAmount: (value: number) => void;
+  onRepay: () => void;
+  pending: string | null;
+}) {
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="space-y-4 py-6">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-24 w-full" />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+            <Skeleton className="h-16" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!loan) {
+    return (
+      <Card className="border-dashed border-2">
+        <CardContent className="flex min-h-[260px] flex-col items-center justify-center text-center">
+          <FileText className="mb-4 h-10 w-10 text-slate-400" />
+          <h3 className="text-xl font-semibold text-[#111827]">No loan request yet</h3>
+          <p className="mt-2 max-w-sm text-sm text-slate-500">
+            Create your first request, then lenders can fund it from the marketplace.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const status = getLoanStatus(loan.status);
+  const total = totalOwed(loan);
+  const remaining = Math.max(total - loan.repaidAmount.toNumber(), 0);
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="border-b border-slate-200 bg-blue-50">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <CardTitle className="text-[#2563EB]">{loan.purpose}</CardTitle>
+            <CardDescription>
+              {getRiskTier(loan.riskTier)} / {loan.termMonths} months / {loan.interestRateBps / 100}% monthly
+            </CardDescription>
+          </div>
+          <Badge variant={status === "Completed" ? "success" : status === "Pending" ? "warning" : "default"}>
+            {status}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5 pt-6">
+        <div>
+          <div className="mb-2 flex justify-between font-mono text-[11px] uppercase tracking-widest">
+            <span className="text-[#2563EB]">{formatUsdc(loan.fundedAmount).toFixed(2)} Funded</span>
+            <span className="text-slate-500">Target: {formatUsdc(loan.amount).toFixed(2)} USDC</span>
+          </div>
+          <Progress value={Math.min((loan.fundedAmount.toNumber() / loan.amount.toNumber()) * 100, 100)} />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Metric label="Total owed" value={`${(total / 1_000_000).toFixed(2)} USDC`} />
+          <Metric label="Repaid" value={`${formatUsdc(loan.repaidAmount).toFixed(2)} USDC`} />
+          <Metric label="Remaining" value={`${(remaining / 1_000_000).toFixed(2)} USDC`} />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          <Field label="Repay amount">
+            <Input
+              type="number"
+              min={1}
+              value={repayAmount}
+              onChange={(event) => setRepayAmount(Number(event.target.value))}
+              className="h-10"
+            />
+          </Field>
+          <Button disabled={!["Active", "Repaying"].includes(status) || Boolean(pending)} onClick={onRepay}>
+            {pending === "Repaying installment" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Repay
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-sm border border-slate-200 bg-white p-4">
+      <span className="block text-[9px] uppercase tracking-widest text-slate-500">{label}</span>
+      <span className="mt-1 block font-mono text-sm text-[#111827]">{value}</span>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Label className="grid gap-2 text-sm font-medium text-[#111827]">
+      {label}
+      {children}
+    </Label>
+  );
+}
+
+function InlineError({ message }: { message: string }) {
+  return (
+    <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-700">
+      <AlertCircle className="h-4 w-4" />
+      <AlertDescription className="text-red-700">{message}</AlertDescription>
+    </Alert>
   );
 }

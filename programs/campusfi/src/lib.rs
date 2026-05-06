@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
-declare_id!("6bdF5nkmYRNJEvHFbhkH2hDcDAFF43BVHj89jRu7cKJG");
+declare_id!("GdDRw2Z8wmnVndyNCDndk3AubLp8vrErAtqMFcBri8Nt");
 
 /// CampusFi — Reputation-Based Student Loan Protocol on Solana
 ///

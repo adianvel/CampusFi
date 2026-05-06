@@ -15,6 +15,7 @@ target/
 # Logs
 logs/
 *.log
+.dev-server*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -37,6 +38,9 @@ id.json
 
 # Generated import / backup folders
 archive/
+image.png
+*.tmp
+*.bak
 
 # Local planning and product docs
 implementation_plan.md
@@ -45,11 +49,20 @@ CampusFi-PRD.md
 CampusFi-PRD.mdc
 brand.md
 CLAUDE.md
+CODEX_CONTEXT.md
+paddleocr.md
+supabase-key.md
+postgre.md
+walletdeploy.md
+*key*.md
+*secret*.md
+*password*.md
 
 # Tooling and local agent state
 .agents/
 .claude/
 .superstack/
+supabase/.temp/
 
 # OS and editor files
 .DS_Store
