@@ -74,14 +74,17 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
         if (!isMounted || !restoredVerification) return;
         saveStudentVerification(restoredVerification, walletAddress);
         setVerification(restoredVerification);
+        setVerificationError(null);
         setVerificationEmail(restoredVerification.email);
         setProfileForm((current) => ({
           ...current,
           university: current.university || restoredVerification.universityDomain.replace(".ac.id", "").toUpperCase(),
         }));
       })
-      .catch(() => {
-        if (isMounted) setVerification(null);
+      .catch((err) => {
+        if (!isMounted) return;
+        setVerification(null);
+        setVerificationError(err instanceof Error ? err.message : "Could not restore student verification.");
       });
 
     return () => {

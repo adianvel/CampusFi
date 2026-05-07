@@ -57,8 +57,10 @@ export function AppDashboard() {
         setIsStudentVerified(true);
         setNotice(null);
       })
-      .catch(() => {
-        if (isMounted) setIsStudentVerified(false);
+      .catch((err) => {
+        if (!isMounted) return;
+        setIsStudentVerified(false);
+        setNotice(err instanceof Error ? err.message : "Could not restore student verification.");
       });
 
     return () => {

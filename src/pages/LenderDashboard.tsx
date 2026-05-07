@@ -35,6 +35,9 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
       loan: marketplaceLoans.find((loan) => loan.publicKey.equals(funding.loanRequest)) ?? null,
     }));
   }, [lenderFundings, marketplaceLoans]);
+  const fundableMarketplaceLoans = useMemo(() => {
+    return marketplaceLoans.filter((loan) => loan.fundedAmount.toNumber() < loan.amount.toNumber());
+  }, [marketplaceLoans]);
 
   async function runAction(action: () => Promise<void>) {
     setFormError(null);
@@ -103,19 +106,19 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
               <Skeleton className="h-56" />
             </CardContent>
           </Card>
-        ) : marketplaceLoans.length === 0 ? (
+        ) : fundableMarketplaceLoans.length === 0 ? (
           <Card className="border-dashed border-2">
             <CardContent className="flex min-h-[260px] flex-col items-center justify-center text-center">
               <ShieldCheck className="mb-4 h-10 w-10 text-slate-400" />
-              <h3 className="text-xl font-semibold text-[#111827]">No loan requests yet</h3>
+              <h3 className="text-xl font-semibold text-[#111827]">No fundable requests</h3>
               <p className="mt-2 max-w-sm text-sm text-slate-500">
-                Student-created on-chain loan requests will appear here.
+                New student loan requests will appear here until they are fully funded.
               </p>
             </CardContent>
           </Card>
         ) : (
           <>
-            {marketplaceLoans.some((loan) => publicKey && loan.student.equals(publicKey)) && (
+            {fundableMarketplaceLoans.some((loan) => publicKey && loan.student.equals(publicKey)) && (
               <Alert className="border-blue-200 bg-blue-50 text-blue-800">
                 <ShieldCheck className="h-4 w-4" />
                 <AlertDescription className="text-blue-800">
@@ -124,7 +127,7 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
               </Alert>
             )}
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {marketplaceLoans.map((loan) => {
+              {fundableMarketplaceLoans.map((loan) => {
                 const key = loan.publicKey.toBase58();
                 const remaining = Math.max(loan.amount.toNumber() - loan.fundedAmount.toNumber(), 0);
                 const remainingUsdc = remaining / 1_000_000;
