@@ -201,7 +201,7 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
         <Alert className="border-amber-200 bg-amber-50 text-amber-800">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription className="text-amber-800">
-            Some funded positions were created before the claim vault upgrade. Their profit is visible, but on-chain claiming is available for new funding positions.
+            Some funded positions were created before the claim vault upgrade. Their profit is visible, but on-chain claiming is available only for positions funded after the upgrade.
           </AlertDescription>
         </Alert>
       )}
@@ -277,7 +277,7 @@ function PortfolioRow({
         <div className="flex flex-col items-start gap-2">
           <span className="font-mono">{(claimable / 1_000_000).toFixed(2)} USDC</span>
           {!usesClaimableVault(funding) && (
-            <span className="font-mono text-[9px] uppercase tracking-widest text-amber-600">Legacy vault</span>
+            <span className="font-mono text-[9px] uppercase tracking-widest text-amber-600">Funded before claim upgrade</span>
           )}
         </div>
       </TableCell>
