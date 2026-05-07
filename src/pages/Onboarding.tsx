@@ -35,7 +35,9 @@ export function Onboarding() {
   const [selectedRole, setSelectedRole] = useState<Role>(initialRole);
 
   const dashboardPath = useMemo(() => {
-    return `/app?role=${selectedRole}`;
+    return selectedRole === "student"
+      ? `/app/profile?role=${selectedRole}`
+      : `/app?role=${selectedRole}`;
   }, [selectedRole]);
 
   useEffect(() => {

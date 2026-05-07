@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { UserCircle2, Settings, LogOut, LayoutDashboard, Search, ShieldCheck } from "lucide-react";
@@ -9,10 +9,12 @@ import { Alert, AlertDescription } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Card, CardContent } from "@/src/components/ui/card";
 import { Separator } from "@/src/components/ui/separator";
+import { getStudentVerification, loadStudentVerification, saveStudentVerification } from "@/src/lib/studentVerification";
 import campfiLogo from "@/src/assets/logo-campfi.webp";
 
 export function AppDashboard() {
   const location = useLocation();
+  const { publicKey } = useWallet();
   const [searchParams] = useSearchParams();
   const locationState = location.state as { role?: "student" | "lender" } | null;
   const queryRole = searchParams.get("role");
@@ -28,6 +30,47 @@ export function AppDashboard() {
           : null;
   const [role] = useState<"student" | "lender" | null>(initialRole);
   const [notice, setNotice] = useState<string | null>(null);
+  const [isStudentVerified, setIsStudentVerified] = useState(false);
+
+  useEffect(() => {
+    if (role !== "student") return;
+
+    const walletAddress = publicKey?.toBase58();
+    if (!walletAddress) {
+      setIsStudentVerified(false);
+      return;
+    }
+
+    const cachedVerification = loadStudentVerification(walletAddress);
+    if (cachedVerification?.status === "verified") {
+      setIsStudentVerified(true);
+      setNotice(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    getStudentVerification(walletAddress)
+      .then((verification) => {
+        if (!isMounted || verification?.status !== "verified") return;
+        saveStudentVerification(verification, walletAddress);
+        setIsStudentVerified(true);
+        setNotice(null);
+      })
+      .catch(() => {
+        if (isMounted) setIsStudentVerified(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [publicKey, role]);
+
+  useEffect(() => {
+    if (location.pathname === "/app") {
+      setNotice(null);
+    }
+  }, [location.pathname]);
 
   if (!role) {
     return <Navigate to="/onboarding" replace />;
@@ -88,6 +131,7 @@ export function AppDashboard() {
                 label="My Loan"
                 onBlocked={() => setNotice("Verify identity first before opening My Loan.")}
                 requiresStudentVerification
+                isStudentVerified={isStudentVerified}
               />
             </>
           ) : (
@@ -174,12 +218,14 @@ function NavItem({
   label,
   onBlocked,
   requiresStudentVerification = false,
+  isStudentVerified = false,
 }: {
   to: string;
   icon: React.ReactNode;
   label: string;
   onBlocked?: () => void;
   requiresStudentVerification?: boolean;
+  isStudentVerified?: boolean;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -188,8 +234,7 @@ function NavItem({
   function handleClick(event: React.MouseEvent<HTMLAnchorElement>) {
     if (!requiresStudentVerification) return;
 
-    const hasVerification = Boolean(localStorage.getItem("campusfi.studentVerification"));
-    if (hasVerification) return;
+    if (isStudentVerified) return;
 
     event.preventDefault();
     onBlocked?.();

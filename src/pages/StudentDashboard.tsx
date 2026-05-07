@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, FileText, Loader2, RefreshCw, ShieldCheck, Upload } from "lucide-react";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
@@ -11,6 +11,7 @@ import { Skeleton } from "@/src/components/ui/skeleton";
 import { useCampusfi } from "@/src/hooks/useCampusfi";
 import { formatUsdc, getLoanStatus, getRiskTier, totalOwed } from "@/src/lib/campusfiClient";
 import {
+  getStudentVerification,
   loadStudentVerification,
   saveStudentVerification,
   type StudentVerification,
@@ -41,9 +42,9 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
     termMonths: 3,
     interestRateBps: 120,
   });
-  const [repayAmount, setRepayAmount] = useState(51.8);
+  const [repayAmount, setRepayAmount] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
-  const [verification, setVerification] = useState<StudentVerification | null>(() => loadStudentVerification());
+  const [verification, setVerification] = useState<StudentVerification | null>(null);
   const [verificationEmail, setVerificationEmail] = useState("student@ui.ac.id");
   const [ktmFile, setKtmFile] = useState<File | null>(null);
   const [verificationPending, setVerificationPending] = useState(false);
@@ -51,6 +52,42 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
 
   const activeLoan = useMemo(() => studentLoans[0] ?? null, [studentLoans]);
   const reputationScore = studentProfile ? Math.round(studentProfile.reputationScore / 10) : 0;
+
+  useEffect(() => {
+    const walletAddress = publicKey?.toBase58();
+    if (!walletAddress) {
+      setVerification(null);
+      return;
+    }
+
+    const cachedVerification = loadStudentVerification(walletAddress);
+    if (cachedVerification) {
+      setVerification(cachedVerification);
+      setVerificationEmail(cachedVerification.email);
+      return;
+    }
+
+    let isMounted = true;
+
+    getStudentVerification(walletAddress)
+      .then((restoredVerification) => {
+        if (!isMounted || !restoredVerification) return;
+        saveStudentVerification(restoredVerification, walletAddress);
+        setVerification(restoredVerification);
+        setVerificationEmail(restoredVerification.email);
+        setProfileForm((current) => ({
+          ...current,
+          university: current.university || restoredVerification.universityDomain.replace(".ac.id", "").toUpperCase(),
+        }));
+      })
+      .catch(() => {
+        if (isMounted) setVerification(null);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [publicKey]);
 
   async function runAction(action: () => Promise<void>) {
     setFormError(null);
@@ -73,7 +110,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
     setVerificationPending(true);
     try {
       const result = await verifyStudentCredential(verificationEmail, ktmFile, publicKey?.toBase58() ?? "");
-      saveStudentVerification(result);
+      saveStudentVerification(result, publicKey?.toBase58());
       setVerification(result);
       setProfileForm((current) => ({
         ...current,
@@ -293,7 +330,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
             loading={loading}
             repayAmount={repayAmount}
             setRepayAmount={setRepayAmount}
-            onRepay={() => activeLoan && runAction(() => repayLoan(activeLoan, repayAmount))}
+            onRepay={() => activeLoan && runAction(() => repayLoan(activeLoan, parseDecimalAmount(repayAmount)))}
             pending={actionPending}
           />
         </div>
@@ -449,8 +486,8 @@ function LoanCard({
 }: {
   loan: ReturnType<typeof useCampusfi>["studentLoans"][number] | null;
   loading: boolean;
-  repayAmount: number;
-  setRepayAmount: (value: number) => void;
+  repayAmount: string;
+  setRepayAmount: (value: string) => void;
   onRepay: () => void;
   pending: string | null;
 }) {
@@ -487,6 +524,31 @@ function LoanCard({
   const status = getLoanStatus(loan.status);
   const total = totalOwed(loan);
   const remaining = Math.max(total - loan.repaidAmount.toNumber(), 0);
+  const parsedRepayAmount = parseDecimalAmount(repayAmount);
+  const repayDisabledReason =
+    status === "Pending"
+      ? `Loan must be fully funded before repayment. Current funding: ${formatUsdc(loan.fundedAmount).toFixed(2)} / ${formatUsdc(loan.amount).toFixed(2)} USDC.`
+      : status === "Completed"
+        ? "Loan is already completed."
+          : repayAmount.trim() === "" || parsedRepayAmount <= 0
+            ? "Enter a repay amount."
+          : parsedRepayAmount > remaining / 1_000_000
+            ? "Repay amount exceeds the remaining balance."
+            : pending
+              ? pending
+              : null;
+  const repayButtonLabel =
+    pending === "Repaying installment"
+      ? "Repaying"
+      : status === "Pending"
+        ? "Waiting for full funding"
+        : status === "Completed"
+          ? "Completed"
+          : repayAmount.trim() === "" || parsedRepayAmount <= 0
+            ? "Enter amount"
+            : parsedRepayAmount > remaining / 1_000_000
+              ? "Exceeds remaining"
+              : "Repay";
 
   return (
     <Card className="overflow-hidden">
@@ -521,21 +583,32 @@ function LoanCard({
         <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <Field label="Repay amount">
             <Input
-              type="number"
-              min={1}
+              type="text"
+              inputMode="decimal"
               value={repayAmount}
-              onChange={(event) => setRepayAmount(Number(event.target.value))}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (/^\d*([,.]\d{0,6})?$/.test(value)) setRepayAmount(value);
+              }}
               className="h-10"
             />
           </Field>
-          <Button disabled={!["Active", "Repaying"].includes(status) || Boolean(pending)} onClick={onRepay}>
+          <Button disabled={Boolean(repayDisabledReason)} onClick={onRepay}>
             {pending === "Repaying installment" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Repay
+            {repayButtonLabel}
           </Button>
         </div>
+        {repayDisabledReason && (
+          <p className="text-xs leading-5 text-slate-500">{repayDisabledReason}</p>
+        )}
       </CardContent>
     </Card>
   );
+}
+
+function parseDecimalAmount(value: string) {
+  const amount = Number(value.replace(",", "."));
+  return Number.isFinite(amount) ? amount : 0;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

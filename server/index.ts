@@ -35,6 +35,48 @@ type PaddleOcrResponse = {
   };
 };
 
+app.get("/api/student-verification", async (request, response) => {
+  const walletAddress = String(request.query.walletAddress ?? "").trim();
+
+  if (!walletAddress) {
+    return response.status(400).json({ error: "Wallet address is required." });
+  }
+
+  if (!isSupabaseConfigured || !supabaseAdmin) {
+    return response.status(500).json({ error: "Supabase is not configured on the backend." });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("student_verifications")
+    .select("id,wallet_address,student_email,university_domain,ktm_file_name,credential_hash,ocr_text_preview,confidence,status,verified_at")
+    .eq("wallet_address", walletAddress)
+    .eq("status", "verified")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    return response.status(500).json({ error: error.message });
+  }
+
+  if (!data) {
+    return response.json({ status: "unverified" });
+  }
+
+  return response.json({
+    id: data.id,
+    status: data.status,
+    walletAddress: data.wallet_address,
+    email: data.student_email,
+    universityDomain: data.university_domain,
+    ktmFileName: data.ktm_file_name,
+    credentialHash: data.credential_hash,
+    confidence: data.confidence === null ? undefined : Number(data.confidence),
+    ocrTextPreview: data.ocr_text_preview ?? undefined,
+    verifiedAt: data.verified_at ?? undefined,
+  });
+});
+
 app.post("/api/ocr/verify-student", async (request, response) => {
   const { email, walletAddress, fileName, mimeType, fileType, fileBase64 } = request.body as VerifyStudentRequest;
   const normalizedEmail = email?.trim().toLowerCase() ?? "";
@@ -141,6 +183,7 @@ app.post("/api/ocr/verify-student", async (request, response) => {
     return response.json({
       id: insertResult.data.id,
       status: "verified",
+      walletAddress: normalizedWalletAddress,
       email: normalizedEmail,
       universityDomain,
       ktmFileName: fileName,

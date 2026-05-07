@@ -19,6 +19,91 @@
   ],
   "instructions": [
     {
+      "name": "claim_returns",
+      "docs": [
+        "Claim repaid principal and interest owed to a lender funding position."
+      ],
+      "discriminator": [
+        101,
+        89,
+        238,
+        53,
+        82,
+        76,
+        66,
+        221
+      ],
+      "accounts": [
+        {
+          "name": "loan_request",
+          "writable": true
+        },
+        {
+          "name": "loan_funding",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  117,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "loan_request"
+              },
+              {
+                "kind": "account",
+                "path": "lender"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true
+        },
+        {
+          "name": "lender_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "lender",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "create_loan_request",
       "docs": [
         "Create a loan request"
@@ -171,6 +256,23 @@
         {
           "name": "vault_token_account",
           "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "lender",
@@ -337,6 +439,23 @@
         {
           "name": "vault_token_account",
           "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "student",
@@ -551,6 +670,16 @@
       "code": 6013,
       "name": "InvalidReputationScore",
       "msg": "Invalid reputation score (max 1000)"
+    },
+    {
+      "code": 6014,
+      "name": "NothingToClaim",
+      "msg": "No returns are claimable yet"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidVault",
+      "msg": "Invalid protocol vault token account"
     }
   ],
   "types": [

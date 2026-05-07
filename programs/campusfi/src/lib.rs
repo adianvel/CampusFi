@@ -90,8 +90,9 @@ pub mod campusfi {
     ) -> Result<()> {
         let loan = &mut ctx.accounts.loan_request;
         require!(loan.status == LoanStatus::Pending as u8 || loan.status == LoanStatus::Active as u8, CampusfiError::LoanNotFundable);
+        require!(amount > 0, CampusfiError::InvalidAmount);
 
-        let remaining = loan.amount.checked_sub(loan.funded_amount).unwrap();
+        let remaining = loan.amount.checked_sub(loan.funded_amount).ok_or(CampusfiError::OverFunding)?;
         require!(amount <= remaining, CampusfiError::OverFunding);
 
         // Transfer USDC from lender to vault
@@ -103,19 +104,21 @@ pub mod campusfi {
         let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
         token::transfer(cpi_ctx, amount)?;
 
-        loan.funded_amount += amount;
+        loan.funded_amount = loan.funded_amount.checked_add(amount).ok_or(CampusfiError::OverFunding)?;
         if loan.funded_amount >= loan.amount {
             loan.status = LoanStatus::Active as u8;
         }
 
-        // Record the funding
+        // Record a new funding position, or top up the existing lender position.
         let funding = &mut ctx.accounts.loan_funding;
-        funding.lender = ctx.accounts.lender.key();
-        funding.loan_request = ctx.accounts.loan_request.key();
-        funding.amount = amount;
-        funding.funded_at = Clock::get()?.unix_timestamp;
+        if funding.amount == 0 {
+            funding.lender = ctx.accounts.lender.key();
+            funding.loan_request = ctx.accounts.loan_request.key();
+            funding.funded_at = Clock::get()?.unix_timestamp;
+            funding.bump = ctx.bumps.loan_funding;
+        }
+        funding.amount = funding.amount.checked_add(amount).ok_or(CampusfiError::OverFunding)?;
         funding.returns_claimed = 0;
-        funding.bump = ctx.bumps.loan_funding;
 
         Ok(())
     }
@@ -154,6 +157,42 @@ pub mod campusfi {
         Ok(())
     }
 
+    /// Claim repaid principal and interest owed to a lender funding position.
+    pub fn claim_returns(ctx: Context<ClaimReturns>) -> Result<()> {
+        let loan = &ctx.accounts.loan_request;
+        let funding = &mut ctx.accounts.loan_funding;
+        require!(funding.amount > 0, CampusfiError::NothingToClaim);
+
+        let claimable = calculate_lender_claimable(
+            loan.repaid_amount,
+            loan.amount,
+            funding.amount,
+            funding.returns_claimed,
+        )?;
+        require!(claimable > 0, CampusfiError::NothingToClaim);
+
+        let vault_bump = ctx.bumps.vault_authority;
+        let signer_seeds: &[&[&[u8]]] = &[&[b"vault", &[vault_bump]]];
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.vault_token_account.to_account_info(),
+            to: ctx.accounts.lender_token_account.to_account_info(),
+            authority: ctx.accounts.vault_authority.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            cpi_accounts,
+            signer_seeds,
+        );
+        token::transfer(cpi_ctx, claimable)?;
+
+        funding.returns_claimed = funding
+            .returns_claimed
+            .checked_add(claimable)
+            .ok_or(CampusfiError::Overpayment)?;
+
+        Ok(())
+    }
+
     /// Update student reputation score (admin-only)
     pub fn update_reputation(
         ctx: Context<UpdateReputation>,
@@ -179,6 +218,26 @@ fn calculate_total_owed(principal: u64, interest_rate_bps: u16, term_months: u8)
     let rate = interest_rate_bps as u64;
     let months = term_months as u64;
     principal + (principal * rate * months) / 10_000
+}
+
+fn calculate_lender_claimable(
+    repaid_amount: u64,
+    loan_amount: u64,
+    funding_amount: u64,
+    already_claimed: u64,
+) -> Result<u64> {
+    if loan_amount == 0 {
+        return Ok(0);
+    }
+
+    let gross_share = (repaid_amount as u128)
+        .checked_mul(funding_amount as u128)
+        .ok_or(CampusfiError::Overpayment)?
+        .checked_div(loan_amount as u128)
+        .ok_or(CampusfiError::Overpayment)?;
+    let gross_share = u64::try_from(gross_share).map_err(|_| CampusfiError::Overpayment)?;
+
+    Ok(gross_share.saturating_sub(already_claimed))
 }
 
 /* ─── Account Structs ─── */
@@ -239,7 +298,7 @@ pub struct CreateLoanRequest<'info> {
 #[derive(Accounts)]
 pub struct FundLoan<'info> {
     #[account(
-        init,
+        init_if_needed,
         payer = lender,
         space = 8 + 32 + 32 + 8 + 8 + 8 + 1,
         seeds = [b"funding", loan_request.key().as_ref(), lender.key().as_ref()],
@@ -250,8 +309,17 @@ pub struct FundLoan<'info> {
     pub loan_request: Account<'info, LoanRequest>,
     #[account(mut)]
     pub lender_token_account: Account<'info, TokenAccount>,
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = vault_token_account.owner == vault_authority.key() @ CampusfiError::InvalidVault,
+    )]
     pub vault_token_account: Account<'info, TokenAccount>,
+    /// CHECK: PDA token authority for the protocol vault.
+    #[account(
+        seeds = [b"vault"],
+        bump,
+    )]
+    pub vault_authority: UncheckedAccount<'info>,
     #[account(mut)]
     pub lender: Signer<'info>,
     pub token_program: Program<'info, Token>,
@@ -267,10 +335,49 @@ pub struct RepayInstallment<'info> {
     pub loan_request: Account<'info, LoanRequest>,
     #[account(mut)]
     pub student_token_account: Account<'info, TokenAccount>,
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = vault_token_account.owner == vault_authority.key() @ CampusfiError::InvalidVault,
+    )]
     pub vault_token_account: Account<'info, TokenAccount>,
+    /// CHECK: PDA token authority for the protocol vault.
+    #[account(
+        seeds = [b"vault"],
+        bump,
+    )]
+    pub vault_authority: UncheckedAccount<'info>,
     #[account(mut)]
     pub student: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimReturns<'info> {
+    #[account(mut)]
+    pub loan_request: Account<'info, LoanRequest>,
+    #[account(
+        mut,
+        seeds = [b"funding", loan_request.key().as_ref(), lender.key().as_ref()],
+        bump = loan_funding.bump,
+        constraint = loan_funding.lender == lender.key() @ CampusfiError::Unauthorized,
+        constraint = loan_funding.loan_request == loan_request.key() @ CampusfiError::Unauthorized,
+    )]
+    pub loan_funding: Account<'info, LoanFunding>,
+    #[account(
+        mut,
+        constraint = vault_token_account.owner == vault_authority.key() @ CampusfiError::InvalidVault,
+    )]
+    pub vault_token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub lender_token_account: Account<'info, TokenAccount>,
+    /// CHECK: PDA token authority for the protocol vault.
+    #[account(
+        seeds = [b"vault"],
+        bump,
+    )]
+    pub vault_authority: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub lender: Signer<'info>,
     pub token_program: Program<'info, Token>,
 }
 
@@ -381,4 +488,8 @@ pub enum CampusfiError {
     InvalidInterestRate,
     #[msg("Invalid reputation score (max 1000)")]
     InvalidReputationScore,
+    #[msg("No returns are claimable yet")]
+    NothingToClaim,
+    #[msg("Invalid protocol vault token account")]
+    InvalidVault,
 }

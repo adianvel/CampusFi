@@ -3,6 +3,7 @@ export type StudentVerificationStatus = "unverified" | "pending" | "verified" | 
 export type StudentVerification = {
   id?: string;
   status: StudentVerificationStatus;
+  walletAddress?: string;
   email: string;
   universityDomain: string;
   ktmFileName: string;
@@ -12,19 +13,34 @@ export type StudentVerification = {
   verifiedAt?: string;
 };
 
-export function loadStudentVerification(): StudentVerification | null {
-  const raw = localStorage.getItem("campusfi.studentVerification");
+const legacyVerificationKey = "campusfi.studentVerification";
+
+function verificationKey(walletAddress?: string | null) {
+  return walletAddress ? `${legacyVerificationKey}.${walletAddress}` : legacyVerificationKey;
+}
+
+export function loadStudentVerification(walletAddress?: string | null): StudentVerification | null {
+  const raw = localStorage.getItem(verificationKey(walletAddress)) ?? localStorage.getItem(legacyVerificationKey);
   if (!raw) return null;
 
   try {
-    return JSON.parse(raw) as StudentVerification;
+    const verification = JSON.parse(raw) as StudentVerification;
+    if (walletAddress && verification.walletAddress && verification.walletAddress !== walletAddress) {
+      return null;
+    }
+    return verification;
   } catch {
     return null;
   }
 }
 
-export function saveStudentVerification(verification: StudentVerification) {
-  localStorage.setItem("campusfi.studentVerification", JSON.stringify(verification));
+export function saveStudentVerification(verification: StudentVerification, walletAddress?: string | null) {
+  const serialized = JSON.stringify(verification);
+  localStorage.setItem(legacyVerificationKey, serialized);
+  const scopedWallet = walletAddress ?? verification.walletAddress;
+  if (scopedWallet) {
+    localStorage.setItem(verificationKey(scopedWallet), serialized);
+  }
 }
 
 export function isStudentEmail(email: string) {
@@ -76,6 +92,28 @@ export async function verifyStudentCredential(email: string, ktmFile: File, wall
 
   if (!response.ok) {
     throw new Error(payload?.error || "Student verification failed.");
+  }
+
+  return payload as StudentVerification;
+}
+
+export async function getStudentVerification(walletAddress: string) {
+  if (!walletAddress.trim()) return null;
+
+  const response = await fetch(`/api/student-verification?walletAddress=${encodeURIComponent(walletAddress)}`);
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(payload?.error || "Could not load student verification.");
+  }
+
+  if (payload?.status !== "verified") {
+    return null;
   }
 
   return payload as StudentVerification;

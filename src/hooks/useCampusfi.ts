@@ -4,17 +4,20 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import {
   PROGRAM_ID,
   USDC_MINT,
+  formatUsdc,
   createCampusfiProgram,
-  ensureAta,
   loanFundingPda,
   loanRequestPda,
+  maybeCreateAtaInstruction,
   parseUsdc,
   studentProfilePda,
   systemProgram,
+  vaultAuthorityPda,
+  type LoanFundingData,
   type LoanRequestData,
   type StudentProfileData,
 } from "@/src/lib/campusfiClient";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { getAccount, getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 function toAnchorWallet(wallet: ReturnType<typeof useWallet>): anchor.Wallet | null {
   if (!wallet.publicKey || !wallet.signTransaction || !wallet.signAllTransactions) {
@@ -34,6 +37,7 @@ export function useCampusfi() {
   const [studentProfile, setStudentProfile] = useState<StudentProfileData | null>(null);
   const [studentLoans, setStudentLoans] = useState<LoanRequestData[]>([]);
   const [marketplaceLoans, setMarketplaceLoans] = useState<LoanRequestData[]>([]);
+  const [lenderFundings, setLenderFundings] = useState<LoanFundingData[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionPending, setActionPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +46,9 @@ export function useCampusfi() {
     const message = err instanceof Error ? err.message : "CampusFi transaction failed";
     if (message.includes("Attempt to load a program that does not exist")) {
       return "CampusFi program is not deployed at the configured devnet program ID. Deploy the Anchor program or update VITE_PROGRAM_ID.";
+    }
+    if (message.includes("insufficient funds") || message.includes("custom program error: 0x1")) {
+      return "Insufficient devnet USDC balance. Get test USDC for the lender wallet, then try again.";
     }
     return message;
   }
@@ -58,6 +65,7 @@ export function useCampusfi() {
       setStudentProfile(null);
       setStudentLoans([]);
       setMarketplaceLoans([]);
+      setLenderFundings([]);
       return;
     }
 
@@ -92,6 +100,17 @@ export function useCampusfi() {
         allLoans
           .filter((loan) => loan.student.equals(wallet.publicKey!))
           .sort((a, b) => b.createdAt.toNumber() - a.createdAt.toNumber()),
+      );
+
+      const allFundings = (await program.account.loanFunding.all()).map((item) => ({
+        publicKey: item.publicKey,
+        ...item.account,
+      })) as LoanFundingData[];
+
+      setLenderFundings(
+        allFundings
+          .filter((funding) => funding.lender.equals(wallet.publicKey!))
+          .sort((a, b) => b.fundedAt.toNumber() - a.fundedAt.toNumber()),
       );
     } catch (err) {
       setError(normalizeError(err));
@@ -174,33 +193,35 @@ export function useCampusfi() {
       setActionPending("Funding loan request");
       setError(null);
       try {
-        const lenderTokenAccount = await ensureAta(
+        const lenderTokenAccount = await getAssociatedTokenAddress(USDC_MINT, wallet.publicKey);
+        const lenderTokenBalance = await getAccount(connection, lenderTokenAccount);
+        const requestedAmount = parseUsdc(amount);
+        if (lenderTokenBalance.amount < BigInt(requestedAmount.toString())) {
+          throw new Error(
+            `Insufficient devnet USDC balance. Need ${amount.toFixed(2)} USDC, available ${formatUsdc(Number(lenderTokenBalance.amount)).toFixed(2)} USDC.`,
+          );
+        }
+        const { ata: vaultTokenAccount, instruction: createVaultTokenAccountInstruction } = await maybeCreateAtaInstruction(
           connection,
-          wallet.sendTransaction,
           wallet.publicKey,
           USDC_MINT,
-          wallet.publicKey,
-        );
-        const vaultTokenAccount = await ensureAta(
-          connection,
-          wallet.sendTransaction,
-          wallet.publicKey,
-          USDC_MINT,
-          PROGRAM_ID,
+          vaultAuthorityPda(),
           true,
         );
 
         await program.methods
-          .fundLoan(parseUsdc(amount))
+          .fundLoan(requestedAmount)
           .accounts({
             loanFunding: loanFundingPda(loan.publicKey, wallet.publicKey),
             loanRequest: loan.publicKey,
             lenderTokenAccount,
             vaultTokenAccount,
+            vaultAuthority: vaultAuthorityPda(),
             lender: wallet.publicKey,
             tokenProgram: TOKEN_PROGRAM_ID,
             systemProgram,
           } as never)
+          .preInstructions(createVaultTokenAccountInstruction ? [createVaultTokenAccountInstruction] : [])
           .rpc();
         await refresh();
       } catch (err) {
@@ -220,29 +241,70 @@ export function useCampusfi() {
       setActionPending("Repaying installment");
       setError(null);
       try {
-        const studentTokenAccount = await ensureAta(
+        const studentTokenAccount = await getAssociatedTokenAddress(USDC_MINT, wallet.publicKey);
+        const studentTokenBalance = await getAccount(connection, studentTokenAccount);
+        const requestedAmount = parseUsdc(amount);
+        if (studentTokenBalance.amount < BigInt(requestedAmount.toString())) {
+          throw new Error(
+            `Insufficient devnet USDC balance. Need ${amount.toFixed(2)} USDC, available ${formatUsdc(Number(studentTokenBalance.amount)).toFixed(2)} USDC.`,
+          );
+        }
+        const { ata: vaultTokenAccount, instruction: createVaultTokenAccountInstruction } = await maybeCreateAtaInstruction(
           connection,
-          wallet.sendTransaction,
           wallet.publicKey,
           USDC_MINT,
-          wallet.publicKey,
-        );
-        const vaultTokenAccount = await ensureAta(
-          connection,
-          wallet.sendTransaction,
-          wallet.publicKey,
-          USDC_MINT,
-          PROGRAM_ID,
+          vaultAuthorityPda(),
           true,
         );
 
         await program.methods
-          .repayInstallment(parseUsdc(amount))
+          .repayInstallment(requestedAmount)
           .accounts({
             loanRequest: loan.publicKey,
             studentTokenAccount,
             vaultTokenAccount,
+            vaultAuthority: vaultAuthorityPda(),
             student: wallet.publicKey,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          } as never)
+          .preInstructions(createVaultTokenAccountInstruction ? [createVaultTokenAccountInstruction] : [])
+          .rpc();
+        await refresh();
+      } catch (err) {
+        setError(normalizeError(err));
+        throw err;
+      } finally {
+        setActionPending(null);
+      }
+    },
+    [connection, program, refresh, wallet.publicKey, wallet.sendTransaction],
+  );
+
+  const claimReturns = useCallback(
+    async (loan: LoanRequestData, funding: LoanFundingData) => {
+      if (!program || !wallet.publicKey) throw new Error("Connect wallet first");
+      if (!wallet.sendTransaction) throw new Error("Wallet cannot send transactions");
+      setActionPending("Claiming lender returns");
+      setError(null);
+      try {
+        const lenderTokenAccount = await getAssociatedTokenAddress(USDC_MINT, wallet.publicKey);
+        const { ata: vaultTokenAccount } = await maybeCreateAtaInstruction(
+          connection,
+          wallet.publicKey,
+          USDC_MINT,
+          vaultAuthorityPda(),
+          true,
+        );
+
+        await program.methods
+          .claimReturns()
+          .accounts({
+            loanRequest: loan.publicKey,
+            loanFunding: funding.publicKey,
+            vaultTokenAccount,
+            lenderTokenAccount,
+            vaultAuthority: vaultAuthorityPda(),
+            lender: wallet.publicKey,
             tokenProgram: TOKEN_PROGRAM_ID,
           } as never)
           .rpc();
@@ -266,10 +328,12 @@ export function useCampusfi() {
     studentProfile,
     studentLoans,
     marketplaceLoans,
+    lenderFundings,
     refresh,
     registerStudent,
     createLoanRequest,
     fundLoan,
     repayLoan,
+    claimReturns,
   };
 }

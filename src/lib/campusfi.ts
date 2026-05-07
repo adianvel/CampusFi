@@ -25,6 +25,91 @@ export type Campusfi = {
   ],
   "instructions": [
     {
+      "name": "claimReturns",
+      "docs": [
+        "Claim repaid principal and interest owed to a lender funding position."
+      ],
+      "discriminator": [
+        101,
+        89,
+        238,
+        53,
+        82,
+        76,
+        66,
+        221
+      ],
+      "accounts": [
+        {
+          "name": "loanRequest",
+          "writable": true
+        },
+        {
+          "name": "loanFunding",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  117,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "loanRequest"
+              },
+              {
+                "kind": "account",
+                "path": "lender"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vaultTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "lenderTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "vaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "lender",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "createLoanRequest",
       "docs": [
         "Create a loan request"
@@ -177,6 +262,23 @@ export type Campusfi = {
         {
           "name": "vaultTokenAccount",
           "writable": true
+        },
+        {
+          "name": "vaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "lender",
@@ -343,6 +445,23 @@ export type Campusfi = {
         {
           "name": "vaultTokenAccount",
           "writable": true
+        },
+        {
+          "name": "vaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "student",
@@ -557,6 +676,16 @@ export type Campusfi = {
       "code": 6013,
       "name": "invalidReputationScore",
       "msg": "Invalid reputation score (max 1000)"
+    },
+    {
+      "code": 6014,
+      "name": "nothingToClaim",
+      "msg": "No returns are claimable yet"
+    },
+    {
+      "code": 6015,
+      "name": "invalidVault",
+      "msg": "Invalid protocol vault token account"
     }
   ],
   "types": [
