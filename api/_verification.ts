@@ -62,7 +62,17 @@ export async function getVerifiedStudentByWallet(walletAddress: string) {
   }
 
   if (!isSupabaseConfigured || !supabaseAdmin) {
-    return { status: 500, body: { error: "Supabase is not configured on the backend." } };
+    console.error("CampusFi verification restore failed: missing Supabase server env", {
+      hasSupabaseUrl: Boolean(process.env.SUPABASE_URL),
+      hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    });
+    return {
+      status: 500,
+      body: {
+        error: "Supabase is not configured on the backend.",
+        code: "SUPABASE_ENV_MISSING",
+      },
+    };
   }
 
   const { data, error } = await supabaseAdmin
@@ -75,7 +85,21 @@ export async function getVerifiedStudentByWallet(walletAddress: string) {
     .maybeSingle();
 
   if (error) {
-    return { status: 500, body: { error: error.message } };
+    console.error("CampusFi verification restore failed: Supabase query error", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+    return {
+      status: 500,
+      body: {
+        error: error.message,
+        code: error.code ?? "SUPABASE_QUERY_FAILED",
+        details: error.details ?? undefined,
+        hint: error.hint ?? undefined,
+      },
+    };
   }
 
   if (!data) {
@@ -119,11 +143,31 @@ export async function verifyStudentCredentialRequest(payload: VerifyStudentReque
   const token = process.env.PADDLEOCR_TOKEN;
 
   if (!apiUrl || !token) {
-    return { status: 500, body: { error: "PaddleOCR is not configured on the backend." } };
+    console.error("CampusFi verification failed: missing PaddleOCR server env", {
+      hasPaddleOcrApiUrl: Boolean(process.env.PADDLEOCR_API_URL),
+      hasPaddleOcrToken: Boolean(process.env.PADDLEOCR_TOKEN),
+    });
+    return {
+      status: 500,
+      body: {
+        error: "PaddleOCR is not configured on the backend.",
+        code: "PADDLEOCR_ENV_MISSING",
+      },
+    };
   }
 
   if (!isSupabaseConfigured || !supabaseAdmin) {
-    return { status: 500, body: { error: "Supabase is not configured on the backend." } };
+    console.error("CampusFi verification failed: missing Supabase server env", {
+      hasSupabaseUrl: Boolean(process.env.SUPABASE_URL),
+      hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    });
+    return {
+      status: 500,
+      body: {
+        error: "Supabase is not configured on the backend.",
+        code: "SUPABASE_ENV_MISSING",
+      },
+    };
   }
 
   try {
@@ -137,7 +181,16 @@ export async function verifyStudentCredentialRequest(payload: VerifyStudentReque
     });
 
     if (uploadResult.error) {
-      return { status: 500, body: { error: uploadResult.error.message } };
+      console.error("CampusFi verification failed: Supabase storage upload error", {
+        message: uploadResult.error.message,
+      });
+      return {
+        status: 500,
+        body: {
+          error: uploadResult.error.message,
+          code: "SUPABASE_STORAGE_UPLOAD_FAILED",
+        },
+      };
     }
 
     const paddleResponse = await fetch(apiUrl, {
@@ -198,7 +251,21 @@ export async function verifyStudentCredentialRequest(payload: VerifyStudentReque
     const insertResult = await supabaseAdmin.from("student_verifications").insert(verification).select("id").single();
 
     if (insertResult.error) {
-      return { status: 500, body: { error: insertResult.error.message } };
+      console.error("CampusFi verification failed: Supabase insert error", {
+        message: insertResult.error.message,
+        code: insertResult.error.code,
+        details: insertResult.error.details,
+        hint: insertResult.error.hint,
+      });
+      return {
+        status: 500,
+        body: {
+          error: insertResult.error.message,
+          code: insertResult.error.code ?? "SUPABASE_INSERT_FAILED",
+          details: insertResult.error.details ?? undefined,
+          hint: insertResult.error.hint ?? undefined,
+        },
+      };
     }
 
     return {
