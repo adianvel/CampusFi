@@ -109,7 +109,8 @@ export async function getStudentVerification(walletAddress: string) {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(payload?.error || "Could not load student verification.");
+    const code = payload?.code ? ` (${payload.code})` : "";
+    throw new Error(`${payload?.error || "Could not load student verification."}${code}`);
   }
 
   if (payload?.status !== "verified") {
