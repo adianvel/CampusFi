@@ -18,6 +18,10 @@ import {
   type StudentProfileData,
 } from "@/src/lib/campusfiClient";
 import { getAccount, getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { PublicKey } from "@solana/web3.js";
+
+const ER_VALIDATOR_DEVNET = new PublicKey("MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57");
+const DELEGATION_PROGRAM_ID = new PublicKey("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
 
 function toAnchorWallet(wallet: ReturnType<typeof useWallet>): anchor.Wallet | null {
   if (!wallet.publicKey || !wallet.signTransaction || !wallet.signAllTransactions) {
@@ -319,6 +323,68 @@ export function useCampusfi() {
     [connection, program, refresh, wallet.publicKey, wallet.sendTransaction],
   );
 
+  /* ─── MagicBlock Delegation ─── */
+
+  const delegateStudentProfile = useCallback(
+    async () => {
+      if (!program || !wallet.publicKey) throw new Error("Connect wallet first");
+      setActionPending("Delegating profile to MagicBlock ER");
+      setError(null);
+      try {
+        const profilePda = studentProfilePda(wallet.publicKey);
+
+        await (program.methods as any)
+          .delegateStudentProfile()
+          .accounts({
+            payer: wallet.publicKey,
+            studentProfile: profilePda,
+            ownerProgram: PROGRAM_ID,
+            delegationProgram: DELEGATION_PROGRAM_ID,
+            systemProgram,
+          } as never)
+          .remainingAccounts([
+            { pubkey: ER_VALIDATOR_DEVNET, isSigner: false, isWritable: false },
+          ])
+          .rpc();
+        await refresh();
+      } catch (err) {
+        setError(normalizeError(err));
+        throw err;
+      } finally {
+        setActionPending(null);
+      }
+    },
+    [program, refresh, wallet.publicKey],
+  );
+
+  const commitStudentProfile = useCallback(
+    async () => {
+      if (!program || !wallet.publicKey) throw new Error("Connect wallet first");
+      setActionPending("Committing profile to base layer");
+      setError(null);
+      try {
+        const profilePda = studentProfilePda(wallet.publicKey);
+
+        await (program.methods as any)
+          .commitStudentProfile()
+          .accounts({
+            payer: wallet.publicKey,
+            studentProfile: profilePda,
+            magicContext: new PublicKey("MagicContext1111111111111111111111111111111"),
+            magicProgram: new PublicKey("MagicProgram1111111111111111111111111111111"),
+          } as never)
+          .rpc();
+        await refresh();
+      } catch (err) {
+        setError(normalizeError(err));
+        throw err;
+      } finally {
+        setActionPending(null);
+      }
+    },
+    [program, refresh, wallet.publicKey],
+  );
+
   return {
     connected: Boolean(wallet.publicKey),
     publicKey: wallet.publicKey,
@@ -335,5 +401,7 @@ export function useCampusfi() {
     fundLoan,
     repayLoan,
     claimReturns,
+    delegateStudentProfile,
+    commitStudentProfile,
   };
 }

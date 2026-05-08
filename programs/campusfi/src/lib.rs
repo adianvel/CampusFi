@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral};
+use ephemeral_rollups_sdk::cpi::DelegateConfig;
 
 declare_id!("GdDRw2Z8wmnVndyNCDndk3AubLp8vrErAtqMFcBri8Nt");
 
@@ -12,6 +14,7 @@ declare_id!("GdDRw2Z8wmnVndyNCDndk3AubLp8vrErAtqMFcBri8Nt");
 /// - ProtocolConfig: ["config"]
 ///
 /// Currency: USDC (6 decimals) primary, SOL secondary
+#[ephemeral]
 #[program]
 pub mod campusfi {
     use super::*;
@@ -201,6 +204,41 @@ pub mod campusfi {
         require!(new_score <= 1000, CampusfiError::InvalidReputationScore);
         let profile = &mut ctx.accounts.student_profile;
         profile.reputation_score = new_score;
+        Ok(())
+    }
+
+    /// Delegate student profile to Ephemeral Rollup for real-time reputation updates
+    pub fn delegate_student_profile(ctx: Context<DelegateStudentProfile>) -> Result<()> {
+        ctx.accounts.delegate_student_profile(
+            &ctx.accounts.payer,
+            &[b"student", ctx.accounts.payer.key().as_ref()],
+            DelegateConfig {
+                validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
+                ..Default::default()
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Commit student profile state from ER back to base layer
+    pub fn commit_student_profile(ctx: Context<CommitStudentProfile>) -> Result<()> {
+        ephemeral_rollups_sdk::ephem::commit_accounts(
+            &ctx.accounts.payer.to_account_info(),
+            vec![&ctx.accounts.student_profile.to_account_info()],
+            &ctx.accounts.magic_context.to_account_info(),
+            &ctx.accounts.magic_program.to_account_info(),
+        )?;
+        Ok(())
+    }
+
+    /// Undelegate student profile from ER
+    pub fn undelegate_student_profile(ctx: Context<CommitStudentProfile>) -> Result<()> {
+        ephemeral_rollups_sdk::ephem::commit_and_undelegate_accounts(
+            &ctx.accounts.payer.to_account_info(),
+            vec![&ctx.accounts.student_profile.to_account_info()],
+            &ctx.accounts.magic_context.to_account_info(),
+            &ctx.accounts.magic_program.to_account_info(),
+        )?;
         Ok(())
     }
 }
@@ -396,6 +434,29 @@ pub struct UpdateReputation<'info> {
     )]
     pub config: Account<'info, ProtocolConfig>,
     pub admin: Signer<'info>,
+}
+
+#[delegate]
+#[derive(Accounts)]
+pub struct DelegateStudentProfile<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: The student profile PDA to delegate
+    #[account(mut, del)]
+    pub student_profile: AccountInfo<'info>,
+}
+
+#[commit]
+#[derive(Accounts)]
+pub struct CommitStudentProfile<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, seeds = [b"student", payer.key().as_ref()], bump)]
+    pub student_profile: Account<'info, StudentProfile>,
+    /// CHECK: MagicBlock context account
+    pub magic_context: UncheckedAccount<'info>,
+    /// CHECK: MagicBlock program
+    pub magic_program: UncheckedAccount<'info>,
 }
 
 /* ─── Data Accounts ─── */
