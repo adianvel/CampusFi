@@ -4,7 +4,7 @@ import {
   getVerifiedStudentByWallet,
   type VercelRequestLike,
   type VercelResponseLike,
-} from "./verification-utils";
+} from "../server/verification-utils";
 
 export default async function handler(request: VercelRequestLike, response: VercelResponseLike) {
   applyCors(response);

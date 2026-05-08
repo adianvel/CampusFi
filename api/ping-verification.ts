@@ -1,4 +1,4 @@
-import { applyCors, type VercelRequestLike, type VercelResponseLike } from "./verification-utils";
+import { applyCors, type VercelRequestLike, type VercelResponseLike } from "../server/verification-utils";
 
 export default async function handler(request: VercelRequestLike, response: VercelResponseLike) {
   applyCors(response);

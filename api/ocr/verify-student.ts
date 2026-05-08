@@ -4,7 +4,7 @@ import {
   verifyStudentCredentialRequest,
   type VercelRequestLike,
   type VercelResponseLike,
-} from "../verification-utils";
+} from "../../server/verification-utils";
 
 export const config = {
   api: {
