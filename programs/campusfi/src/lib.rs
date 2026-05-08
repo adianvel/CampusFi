@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::pubkey::Pubkey;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral};
-use ephemeral_rollups_sdk::cpi::DelegateConfig;
 
 declare_id!("GdDRw2Z8wmnVndyNCDndk3AubLp8vrErAtqMFcBri8Nt");
 
@@ -209,14 +209,37 @@ pub mod campusfi {
 
     /// Delegate student profile to Ephemeral Rollup for real-time reputation updates
     pub fn delegate_student_profile(ctx: Context<DelegateStudentProfile>) -> Result<()> {
-        ctx.accounts.delegate_student_profile(
-            &ctx.accounts.payer,
-            &[b"student", ctx.accounts.payer.key().as_ref()],
-            DelegateConfig {
+        msg!("[delegate] Starting delegation...");
+        
+        let payer_key = ctx.accounts.payer.key();
+        let seeds: &[&[u8]] = &[b"student", payer_key.as_ref()];
+        let (pda, _) = Pubkey::find_program_address(seeds, &crate::id());
+        msg!("[delegate] PDA: {}", pda);
+        
+        let system_program_info = ctx.accounts.system_program.to_account_info();
+        
+        let del_accounts = ephemeral_rollups_sdk::cpi::DelegateAccounts {
+            payer: ctx.accounts.payer.as_ref(),
+            pda: &ctx.accounts.student_profile,
+            owner_program: &ctx.accounts.owner_program,
+            buffer: &ctx.accounts.buffer_student_profile,
+            delegation_record: &ctx.accounts.delegation_record_student_profile,
+            delegation_metadata: &ctx.accounts.delegation_metadata_student_profile,
+            delegation_program: &ctx.accounts.delegation_program,
+            system_program: &system_program_info,
+        };
+        
+        msg!("[delegate] Calling delegate_account...");
+        ephemeral_rollups_sdk::cpi::delegate_account(
+            del_accounts,
+            seeds,
+            ephemeral_rollups_sdk::cpi::DelegateConfig {
                 validator: ctx.remaining_accounts.first().map(|acc| acc.key()),
                 ..Default::default()
             },
         )?;
+        
+        msg!("[delegate] Delegation complete!");
         Ok(())
     }
 
