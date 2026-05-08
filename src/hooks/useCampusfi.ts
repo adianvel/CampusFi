@@ -22,6 +22,8 @@ import { PublicKey } from "@solana/web3.js";
 
 const ER_VALIDATOR_DEVNET = new PublicKey("MAS1Dt9qreoRMQ14YQuhg8UTZMMzDdKhmkZMECCzk57");
 const DELEGATION_PROGRAM_ID = new PublicKey("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
+const MAGIC_PROGRAM_ID = new PublicKey("Magic11111111111111111111111111111111111111");
+const MAGIC_CONTEXT_ID = new PublicKey("MagicContext1111111111111111111111111111111");
 
 function toAnchorWallet(wallet: ReturnType<typeof useWallet>): anchor.Wallet | null {
   if (!wallet.publicKey || !wallet.signTransaction || !wallet.signAllTransactions) {
@@ -370,8 +372,36 @@ export function useCampusfi() {
           .accounts({
             payer: wallet.publicKey,
             studentProfile: profilePda,
-            magicContext: new PublicKey("MagicContext1111111111111111111111111111111"),
-            magicProgram: new PublicKey("MagicProgram1111111111111111111111111111111"),
+            magicContext: MAGIC_CONTEXT_ID,
+            magicProgram: MAGIC_PROGRAM_ID,
+          } as never)
+          .rpc();
+        await refresh();
+      } catch (err) {
+        setError(normalizeError(err));
+        throw err;
+      } finally {
+        setActionPending(null);
+      }
+    },
+    [program, refresh, wallet.publicKey],
+  );
+
+  const undelegateStudentProfile = useCallback(
+    async () => {
+      if (!program || !wallet.publicKey) throw new Error("Connect wallet first");
+      setActionPending("Undelegating profile from ER");
+      setError(null);
+      try {
+        const profilePda = studentProfilePda(wallet.publicKey);
+
+        await (program.methods as any)
+          .undelegateStudentProfile()
+          .accounts({
+            payer: wallet.publicKey,
+            studentProfile: profilePda,
+            magicContext: MAGIC_CONTEXT_ID,
+            magicProgram: MAGIC_PROGRAM_ID,
           } as never)
           .rpc();
         await refresh();
@@ -403,5 +433,6 @@ export function useCampusfi() {
     claimReturns,
     delegateStudentProfile,
     commitStudentProfile,
+    undelegateStudentProfile,
   };
 }
