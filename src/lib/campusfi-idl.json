@@ -104,6 +104,60 @@
       "args": []
     },
     {
+      "name": "commit_student_profile",
+      "docs": [
+        "Commit student profile state from ER back to base layer"
+      ],
+      "discriminator": [
+        49,
+        252,
+        59,
+        68,
+        124,
+        1,
+        140,
+        27
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "student_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  117,
+                  100,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "magic_context"
+        },
+        {
+          "name": "magic_program"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "create_loan_request",
       "docs": [
         "Create a loan request"
@@ -200,6 +254,177 @@
           "type": "u16"
         }
       ]
+    },
+    {
+      "name": "delegate_student_profile",
+      "docs": [
+        "Delegate student profile to Ephemeral Rollup for real-time reputation updates"
+      ],
+      "discriminator": [
+        47,
+        22,
+        48,
+        227,
+        120,
+        45,
+        180,
+        241
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "buffer_student_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "student_profile"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                232,
+                38,
+                68,
+                123,
+                3,
+                36,
+                219,
+                94,
+                154,
+                236,
+                243,
+                215,
+                130,
+                11,
+                57,
+                126,
+                77,
+                97,
+                200,
+                171,
+                48,
+                18,
+                60,
+                247,
+                108,
+                47,
+                208,
+                139,
+                120,
+                92,
+                175,
+                105
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_student_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "student_profile"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_student_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "student_profile"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "student_profile",
+          "writable": true
+        },
+        {
+          "name": "owner_program",
+          "address": "GdDRw2Z8wmnVndyNCDndk3AubLp8vrErAtqMFcBri8Nt"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "fund_loan",
@@ -352,6 +577,43 @@
       ]
     },
     {
+      "name": "process_undelegation",
+      "discriminator": [
+        196,
+        28,
+        41,
+        206,
+        48,
+        37,
+        51,
+        167
+      ],
+      "accounts": [
+        {
+          "name": "base_account",
+          "writable": true
+        },
+        {
+          "name": "buffer"
+        },
+        {
+          "name": "payer",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "account_seeds",
+          "type": {
+            "vec": "bytes"
+          }
+        }
+      ]
+    },
+    {
       "name": "register_student",
       "docs": [
         "Register a new student profile"
@@ -473,6 +735,60 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "undelegate_student_profile",
+      "docs": [
+        "Undelegate student profile from ER"
+      ],
+      "discriminator": [
+        19,
+        152,
+        111,
+        116,
+        172,
+        157,
+        6,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "student_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  117,
+                  100,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "payer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "magic_context"
+        },
+        {
+          "name": "magic_program"
+        }
+      ],
+      "args": []
     },
     {
       "name": "update_reputation",
