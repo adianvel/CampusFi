@@ -11,6 +11,7 @@ export default defineConfig(({mode}) => {
       react(),
       tailwindcss(),
       nodePolyfills({
+        include: ['buffer', 'process', 'util', 'stream', 'crypto', 'events', 'os'],
         globals: {
           Buffer: true,
           global: true,
@@ -21,10 +22,18 @@ export default defineConfig(({mode}) => {
     ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      global: 'globalThis',
     },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+      },
+    },
+    optimizeDeps: {
+      esbuildOptions: {
+        define: {
+          global: 'globalThis',
+        },
       },
     },
     server: {
