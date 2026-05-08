@@ -9,9 +9,8 @@ export default async function handler(
   response.setHeader("Access-Control-Allow-Origin", "*");
 
   try {
-    const { createClient } = require("@supabase/supabase-js") as typeof import("@supabase/supabase-js");
-
-    const client = createClient(
+    const supabase = await import("@supabase/supabase-js");
+    const client = supabase.createClient(
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } },

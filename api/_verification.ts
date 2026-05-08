@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 let _supabaseAdmin: SupabaseClient | null | undefined;
 
-function getSupabaseAdmin(): SupabaseClient | null {
+async function getSupabaseAdmin(): Promise<SupabaseClient | null> {
   if (_supabaseAdmin !== undefined) return _supabaseAdmin;
 
   const url = process.env.SUPABASE_URL;
@@ -16,7 +16,7 @@ function getSupabaseAdmin(): SupabaseClient | null {
   }
 
   try {
-    const { createClient } = require("@supabase/supabase-js") as typeof import("@supabase/supabase-js");
+    const { createClient } = await import("@supabase/supabase-js");
     _supabaseAdmin = createClient(url, key, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -105,7 +105,7 @@ export async function getVerifiedStudentByWallet(walletAddress: string) {
     return { status: 400, body: { error: "Wallet address is required." } };
   }
 
-  const supabaseAdmin = getSupabaseAdmin();
+  const supabaseAdmin = await getSupabaseAdmin();
   if (!supabaseAdmin) {
     console.error("CampusFi verification restore failed: missing Supabase server env", {
       hasSupabaseUrl: Boolean(process.env.SUPABASE_URL),
@@ -201,7 +201,7 @@ export async function verifyStudentCredentialRequest(payload: VerifyStudentReque
     };
   }
 
-  if (!hasSupabaseEnv() || !getSupabaseAdmin()) {
+  if (!hasSupabaseEnv() || !(await getSupabaseAdmin())) {
     console.error("CampusFi verification failed: missing Supabase server env", {
       hasSupabaseUrl: Boolean(process.env.SUPABASE_URL),
       hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
@@ -215,7 +215,7 @@ export async function verifyStudentCredentialRequest(payload: VerifyStudentReque
     };
   }
 
-  const supabaseAdmin = getSupabaseAdmin()!;
+  const supabaseAdmin = (await getSupabaseAdmin())!;
 
   try {
     await ensureStudentKtmBucket(supabaseAdmin);
