@@ -1,18 +1,35 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const isSupabaseConfigured = Boolean(supabaseUrl && serviceRoleKey);
-const supabaseAdmin = isSupabaseConfigured
-  ? createClient(supabaseUrl!, serviceRoleKey!, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-  : null;
+let _supabaseAdmin: SupabaseClient | null | undefined;
+
+function getSupabaseAdmin(): SupabaseClient | null {
+  if (_supabaseAdmin !== undefined) return _supabaseAdmin;
+
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    _supabaseAdmin = null;
+    return null;
+  }
+
+  try {
+    _supabaseAdmin = createClient(url, key, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    return _supabaseAdmin;
+  } catch {
+    _supabaseAdmin = null;
+    return null;
+  }
+}
+
+function hasSupabaseEnv() {
+  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 const studentKtmBucket = "student-ktm";
 
 type StudentVerificationInsert = {
@@ -87,7 +104,8 @@ export async function getVerifiedStudentByWallet(walletAddress: string) {
     return { status: 400, body: { error: "Wallet address is required." } };
   }
 
-  if (!isSupabaseConfigured || !supabaseAdmin) {
+  const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) {
     console.error("CampusFi verification restore failed: missing Supabase server env", {
       hasSupabaseUrl: Boolean(process.env.SUPABASE_URL),
       hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
@@ -182,7 +200,7 @@ export async function verifyStudentCredentialRequest(payload: VerifyStudentReque
     };
   }
 
-  if (!isSupabaseConfigured || !supabaseAdmin) {
+  if (!hasSupabaseEnv() || !getSupabaseAdmin()) {
     console.error("CampusFi verification failed: missing Supabase server env", {
       hasSupabaseUrl: Boolean(process.env.SUPABASE_URL),
       hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
@@ -196,8 +214,10 @@ export async function verifyStudentCredentialRequest(payload: VerifyStudentReque
     };
   }
 
+  const supabaseAdmin = getSupabaseAdmin()!;
+
   try {
-    await ensureStudentKtmBucket();
+    await ensureStudentKtmBucket(supabaseAdmin);
 
     const fileBuffer = Buffer.from(payload.fileBase64, "base64");
     const filePath = createKtmStoragePath(normalizedWalletAddress, payload.fileName);
@@ -256,6 +276,7 @@ export async function verifyStudentCredentialRequest(payload: VerifyStudentReque
     const verifiedAt = new Date().toISOString();
 
     await upsertVerificationProfile({
+      supabaseAdmin,
       walletAddress: normalizedWalletAddress,
       email: normalizedEmail,
       universityDomain,
@@ -324,11 +345,7 @@ function extractMarkdownText(data: PaddleOcrResponse) {
   );
 }
 
-async function ensureStudentKtmBucket() {
-  if (!supabaseAdmin) {
-    throw new Error("Supabase is not configured on the backend.");
-  }
-
+async function ensureStudentKtmBucket(supabaseAdmin: SupabaseClient) {
   const { data } = await supabaseAdmin.storage.getBucket(studentKtmBucket);
   if (data) return;
 
@@ -344,18 +361,16 @@ async function ensureStudentKtmBucket() {
 }
 
 async function upsertVerificationProfile({
+  supabaseAdmin,
   walletAddress,
   email,
   universityDomain,
 }: {
+  supabaseAdmin: SupabaseClient;
   walletAddress: string;
   email: string;
   universityDomain: string;
 }) {
-  if (!supabaseAdmin) {
-    throw new Error("Supabase is not configured on the backend.");
-  }
-
   const { error } = await supabaseAdmin.from("profiles").upsert(
     {
       wallet_address: walletAddress,
