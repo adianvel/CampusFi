@@ -23,6 +23,7 @@ export default defineConfig(({mode}) => {
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       global: 'globalThis',
+      Buffer: 'globalThis.Buffer',
     },
     resolve: {
       alias: {
@@ -30,6 +31,7 @@ export default defineConfig(({mode}) => {
       },
     },
     optimizeDeps: {
+      include: ['buffer', 'process', 'util', 'stream-browserify', 'events', 'crypto-browserify'],
       esbuildOptions: {
         define: {
           global: 'globalThis',
