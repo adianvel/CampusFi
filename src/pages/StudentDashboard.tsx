@@ -52,6 +52,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
   const [ktmFile, setKtmFile] = useState<File | null>(null);
   const [verificationPending, setVerificationPending] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [verificationLoading, setVerificationLoading] = useState(true);
 
   const activeLoan = useMemo(() => studentLoans[0] ?? null, [studentLoans]);
   const reputationScore = studentProfile ? Math.round(studentProfile.reputationScore / 10) : 0;
@@ -60,6 +61,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
     const walletAddress = publicKey?.toBase58();
     if (!walletAddress) {
       setVerification(null);
+      setVerificationLoading(false);
       return;
     }
 
@@ -67,6 +69,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
     if (cachedVerification) {
       setVerification(cachedVerification);
       setVerificationEmail(cachedVerification.email);
+      setVerificationLoading(false);
       return;
     }
 
@@ -78,6 +81,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
         saveStudentVerification(restoredVerification, walletAddress);
         setVerification(restoredVerification);
         setVerificationError(null);
+        setVerificationLoading(false);
         setVerificationEmail(restoredVerification.email);
         setProfileForm((current) => ({
           ...current,
@@ -87,6 +91,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
       .catch((err) => {
         if (!isMounted) return;
         setVerification(null);
+        setVerificationLoading(false);
         setVerificationError(err instanceof Error ? err.message : "Could not restore student verification.");
       });
 
@@ -174,7 +179,14 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
           </Button>
         </div>
 
-        {!verification ? (
+        {verificationLoading ? (
+          <Card className="border-primary/20">
+            <CardContent className="flex items-center gap-4 p-6">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Checking verification status...</span>
+            </CardContent>
+          </Card>
+        ) : !verification ? (
           <StudentVerificationCard
             email={verificationEmail}
             setEmail={setVerificationEmail}
@@ -262,7 +274,14 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
         </Button>
       </div>
 
-      {!verification ? (
+      {verificationLoading ? (
+        <Card className="border-primary/20">
+          <CardContent className="flex items-center gap-4 p-6">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">Checking verification status...</span>
+          </CardContent>
+        </Card>
+      ) : !verification ? (
         <StudentVerificationCard
           email={verificationEmail}
           setEmail={setVerificationEmail}
