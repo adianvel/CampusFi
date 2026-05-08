@@ -31,6 +31,9 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
     createLoanRequest,
     repayLoan,
     refresh,
+    delegateStudentProfile,
+    commitStudentProfile,
+    undelegateStudentProfile,
   } = useCampusfi();
   const [profileForm, setProfileForm] = useState({
     name: "Rizki Ananda",
@@ -204,6 +207,39 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
                 <Badge variant={reputationScore >= 75 ? "success" : "warning"}>
                   {reputationScore >= 75 ? "Low Risk Tier" : "Medium Risk Tier"}
                 </Badge>
+              </CardContent>
+            </Card>
+
+            <Card className="md:col-span-3">
+              <CardHeader>
+                <CardTitle>MagicBlock Delegation</CardTitle>
+                <CardDescription>Delegate your profile to an Ephemeral Rollup for faster, cheaper reputation updates.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-3">
+                <Button
+                  variant="outline"
+                  disabled={Boolean(actionPending)}
+                  onClick={() => runAction(() => delegateStudentProfile())}
+                >
+                  {actionPending === "Delegating student profile to ER" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Delegate to ER
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={Boolean(actionPending)}
+                  onClick={() => runAction(() => commitStudentProfile())}
+                >
+                  {actionPending === "Committing profile to base layer" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Commit to Base
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={Boolean(actionPending)}
+                  onClick={() => runAction(() => undelegateStudentProfile())}
+                >
+                  {actionPending === "Undelegating profile from ER" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Undelegate
+                </Button>
               </CardContent>
             </Card>
 
