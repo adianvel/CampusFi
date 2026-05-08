@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 let _supabaseAdmin: SupabaseClient | null | undefined;
 
@@ -16,6 +16,7 @@ function getSupabaseAdmin(): SupabaseClient | null {
   }
 
   try {
+    const { createClient } = require("@supabase/supabase-js") as typeof import("@supabase/supabase-js");
     _supabaseAdmin = createClient(url, key, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
