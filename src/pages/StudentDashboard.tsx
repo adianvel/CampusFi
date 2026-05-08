@@ -1,5 +1,5 @@
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, FileText, Loader2, RefreshCw, ShieldCheck, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileText, Loader2, RefreshCw, ShieldCheck, Upload, Zap } from "lucide-react";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
@@ -31,6 +31,9 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
     createLoanRequest,
     repayLoan,
     refresh,
+    delegateStudentProfile,
+    commitStudentProfile,
+    undelegateStudentProfile,
   } = useCampusfi();
   const [profileForm, setProfileForm] = useState({
     name: "Rizki Ananda",
@@ -192,7 +195,8 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
             />
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-3">
+          <>
+            <div className="grid gap-6 md:grid-cols-3">
             <Card className="border-[#3B82F6]/20 bg-[#3B82F6]/5">
               <CardHeader>
                 <CardTitle className="text-[#3B82F6]">Score</CardTitle>
@@ -230,6 +234,14 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
               </CardContent>
             </Card>
           </div>
+
+          <MagicBlockCard
+            pending={actionPending}
+            onDelegate={() => runAction(() => delegateStudentProfile())}
+            onCommit={() => runAction(() => commitStudentProfile())}
+            onUndelegate={() => runAction(() => undelegateStudentProfile())}
+          />
+          </>
         )}
 
         {(error || formError) && <InlineError message={error || formError || ""} />}
@@ -638,5 +650,60 @@ function InlineError({ message }: { message: string }) {
       <AlertCircle className="h-4 w-4" />
       <AlertDescription className="text-red-700">{message}</AlertDescription>
     </Alert>
+  );
+}
+
+function MagicBlockCard({
+  pending,
+  onDelegate,
+  onCommit,
+  onUndelegate,
+}: {
+  pending: string | null;
+  onDelegate: () => void;
+  onCommit: () => void;
+  onUndelegate: () => void;
+}) {
+  return (
+    <Card className="border-emerald-500/30 bg-emerald-500/5">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Zap className="h-5 w-5 text-emerald-400" />
+          <CardTitle className="text-emerald-400">MagicBlock Ephemeral Rollup</CardTitle>
+        </div>
+        <CardDescription>
+          Delegate your reputation profile to MagicBlock for real-time, low-cost updates. Loan operations remain on Solana base layer.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-wrap gap-3">
+        <Button
+          variant="outline"
+          className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
+          disabled={Boolean(pending)}
+          onClick={onDelegate}
+        >
+          {pending === "Delegating profile to MagicBlock ER" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Delegate to ER
+        </Button>
+        <Button
+          variant="outline"
+          className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
+          disabled={Boolean(pending)}
+          onClick={onCommit}
+        >
+          {pending === "Committing profile to base layer" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Commit to Base
+        </Button>
+        <Button
+          variant="outline"
+          className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
+          disabled={Boolean(pending)}
+          onClick={onUndelegate}
+        >
+          {pending === "Undelegating profile from ER" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Undelegate
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

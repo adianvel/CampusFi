@@ -132,49 +132,17 @@ export function useCampusfi() {
   const registerStudent = useCallback(
     async (name: string, university: string) => {
       if (!program || !wallet.publicKey) throw new Error("Connect wallet first");
-      setActionPending("Registering student profile...");
+      setActionPending("Registering student profile");
       setError(null);
       try {
-        const profilePda = studentProfilePda(wallet.publicKey);
-
         await program.methods
           .registerStudent(name, university)
           .accounts({
-            studentProfile: profilePda,
+            studentProfile: studentProfilePda(wallet.publicKey),
             authority: wallet.publicKey,
             systemProgram,
           } as never)
           .rpc();
-
-        setActionPending("Delegating to MagicBlock ER...");
-
-        const [bufferPda] = PublicKey.findProgramAddressSync(
-          [Buffer.from("buffer"), profilePda.toBuffer()],
-          PROGRAM_ID,
-        );
-        const [delegationRecordPda] = PublicKey.findProgramAddressSync(
-          [Buffer.from("delegation"), profilePda.toBuffer()],
-          DELEGATION_PROGRAM_ID,
-        );
-        const [delegationMetadataPda] = PublicKey.findProgramAddressSync(
-          [Buffer.from("delegation-metadata"), profilePda.toBuffer()],
-          DELEGATION_PROGRAM_ID,
-        );
-
-        await (program.methods as any)
-          .delegateStudentProfile()
-          .accounts({
-            payer: wallet.publicKey,
-            bufferStudentProfile: bufferPda,
-            delegationRecordStudentProfile: delegationRecordPda,
-            delegationMetadataStudentProfile: delegationMetadataPda,
-            studentProfile: profilePda,
-            ownerProgram: PROGRAM_ID,
-            delegationProgram: DELEGATION_PROGRAM_ID,
-            systemProgram,
-          } as never)
-          .rpc();
-
         await refresh();
       } catch (err) {
         setError(normalizeError(err));
