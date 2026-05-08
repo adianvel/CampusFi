@@ -477,10 +477,6 @@ pub struct CommitStudentProfile<'info> {
     /// CHECK: May be owned by delegation program after delegation
     #[account(mut)]
     pub student_profile: UncheckedAccount<'info>,
-    /// CHECK: MagicBlock context account
-    pub magic_context: UncheckedAccount<'info>,
-    /// CHECK: MagicBlock program
-    pub magic_program: UncheckedAccount<'info>,
 }
 
 /* ─── Data Accounts ─── */
