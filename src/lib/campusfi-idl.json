@@ -126,27 +126,7 @@
         },
         {
           "name": "student_profile",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  116,
-                  117,
-                  100,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "payer"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "magic_context"
@@ -759,27 +739,7 @@
         },
         {
           "name": "student_profile",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  116,
-                  117,
-                  100,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "payer"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "magic_context"
@@ -996,6 +956,11 @@
       "code": 6015,
       "name": "InvalidVault",
       "msg": "Invalid protocol vault token account"
+    },
+    {
+      "code": 6016,
+      "name": "AlreadyDelegated",
+      "msg": "Profile is already delegated — undelegate first"
     }
   ],
   "types": [
