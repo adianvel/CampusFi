@@ -360,6 +360,9 @@ export function useCampusfi() {
             delegationProgram: DELEGATION_PROGRAM_ID,
             systemProgram,
           } as never)
+          .remainingAccounts([
+            { pubkey: ER_VALIDATOR_DEVNET, isSigner: false, isWritable: false },
+          ])
           .rpc();
         await refresh();
       } catch (err) {

@@ -227,6 +227,7 @@ pub mod campusfi {
             vec![&ctx.accounts.student_profile.to_account_info()],
             &ctx.accounts.magic_context.to_account_info(),
             &ctx.accounts.magic_program.to_account_info(),
+            None,
         )?;
         Ok(())
     }
@@ -238,6 +239,7 @@ pub mod campusfi {
             vec![&ctx.accounts.student_profile.to_account_info()],
             &ctx.accounts.magic_context.to_account_info(),
             &ctx.accounts.magic_program.to_account_info(),
+            None,
         )?;
         Ok(())
     }
