@@ -327,6 +327,7 @@ function PortfolioRow({
   const repaidShare = loan ? lenderRepaidShare(loan, funding) : 0;
   const claimable = loan ? lenderClaimable(loan, funding) : 0;
   const canClaim = Boolean(loan && claimable > 0 && usesClaimableVault(funding));
+  const hasClaimed = funding.returnsClaimed.toNumber() > 0;
   const status = loan ? getLoanStatus(loan.status) : "Tracked";
 
   return (
@@ -352,7 +353,7 @@ function PortfolioRow({
           <span className="font-mono text-[10px] uppercase tracking-widest text-[#2563EB]">{status}</span>
           <Button size="sm" disabled={!canClaim || pending} onClick={onClaim}>
             {pending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
-            {canClaim ? "Claim" : "Not claimable"}
+            {canClaim ? "Claim" : hasClaimed ? "Claimed ✓" : "Not claimable"}
           </Button>
         </div>
       </TableCell>
@@ -393,20 +394,20 @@ function LoanMarketCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-1 space-y-4">
-        <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-4 font-mono text-[11px]">
+        <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-4">
           <div>
-            <div className="mb-1 uppercase tracking-widest text-slate-500">Request</div>
-            <div className="font-bold text-[#111827]">{formatUsdc(loan.amount).toFixed(2)} USDC</div>
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-widest text-slate-500">Request</div>
+            <div className="text-base font-bold text-[#111827]">{formatUsdc(loan.amount).toFixed(2)} USDC</div>
           </div>
           <div>
-            <div className="mb-1 uppercase tracking-widest text-slate-500">Return</div>
-            <div className="font-bold text-[#3B82F6]">{loan.interestRateBps / 100}% /mo</div>
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-widest text-slate-500">Return</div>
+            <div className="text-base font-bold text-[#3B82F6]">{loan.interestRateBps / 100}% /mo</div>
           </div>
         </div>
 
         <div>
-          <div className="mb-1 flex items-end justify-between text-[9px] uppercase tracking-widest">
-            <span className="text-[#3B82F6]">{fundedPct.toFixed(0)}% Funded</span>
+          <div className="mb-1 flex items-end justify-between text-[11px] uppercase tracking-widest">
+            <span className="font-semibold text-[#3B82F6]">{fundedPct.toFixed(0)}% Funded</span>
             <span className="font-mono text-slate-500">Remaining: {(remaining / 1_000_000).toFixed(2)}</span>
           </div>
           <Progress value={fundedPct} />

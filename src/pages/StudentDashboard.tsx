@@ -799,7 +799,7 @@ function LoanCard({
       </CardHeader>
       <CardContent className="space-y-5 pt-6">
         <div>
-          <div className="mb-2 flex justify-between font-mono text-[11px] uppercase tracking-widest">
+          <div className="mb-2 flex justify-between font-mono text-xs uppercase tracking-widest">
             <span className="text-[#2563EB]">{formatUsdc(loan.fundedAmount).toFixed(2)} Funded</span>
             <span className="text-slate-500">Target: {formatUsdc(loan.amount).toFixed(2)} USDC</span>
           </div>
@@ -895,8 +895,8 @@ function parseDecimalAmount(value: string) {
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-sm border border-slate-200 bg-white p-4">
-      <span className="block text-[9px] uppercase tracking-widest text-slate-500">{label}</span>
-      <span className="mt-1 block font-mono text-sm text-[#111827]">{value}</span>
+      <span className="block text-[11px] uppercase tracking-widest text-slate-500">{label}</span>
+      <span className="mt-1 block font-mono text-base font-semibold text-[#111827]">{value}</span>
     </div>
   );
 }
