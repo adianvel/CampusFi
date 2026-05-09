@@ -135,6 +135,16 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
     }
   }
 
+  // Auto-register on-chain profile from KTM data when verified but no profile exists
+  useEffect(() => {
+    if (!verification || studentProfile || !connected || actionPending) return;
+    const name = verification.studentName || verification.email?.split("@")[0] || "Student";
+    const university = verification.university || verification.universityDomain?.replace(".ac.id", "").toUpperCase() || "University";
+    if (name.length > 2 && university.length > 2) {
+      runAction(() => registerStudent(name.slice(0, 64), university.slice(0, 64)));
+    }
+  }, [verification, studentProfile, connected]);
+
   async function handleStudentVerification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setVerificationError(null);
