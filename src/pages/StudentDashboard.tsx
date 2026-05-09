@@ -231,12 +231,16 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
 
             <Card className="md:col-span-2">
               <CardHeader>
-                <CardTitle>{studentProfile.name}</CardTitle>
-                <CardDescription>{studentProfile.university}</CardDescription>
+                <CardTitle>{verification?.studentName || studentProfile.name}</CardTitle>
+                <CardDescription>
+                  {verification?.nim ? `${verification.nim}  ·  ` : ""}
+                  {verification?.university || studentProfile.university}
+                  {verification?.major ? `  ·  ${verification.major}` : ""}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
-                  ["Identity profile", studentProfile.identityVerified ? "Verified" : "Profile created"],
+                  ["Status", "KTM Verified + On-chain"],
                   ["Loans created", String(studentProfile.loansCount)],
                   ["Wallet authority", studentProfile.authority.toBase58().slice(0, 8) + "..."],
                   ["Repayment history", studentLoans.length ? "On-chain loan found" : "No repayment history yet"],
