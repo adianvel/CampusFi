@@ -231,6 +231,18 @@ export function useCampusfi() {
           } as never)
           .preInstructions(createVaultTokenAccountInstruction ? [createVaultTokenAccountInstruction] : [])
           .rpc();
+
+        const newFundedAmount = new anchor.BN(loan.fundedAmount.toNumber() + requestedAmount.toNumber());
+        const newStatus = newFundedAmount.toNumber() >= loan.amount.toNumber() ? 1 : loan.status;
+
+        setMarketplaceLoans((prev) =>
+          prev.map((l) =>
+            l.publicKey.equals(loan.publicKey)
+              ? { ...l, fundedAmount: newFundedAmount, status: newStatus }
+              : l,
+          ),
+        );
+
         await refresh();
         return sig;
       } catch (err) {
