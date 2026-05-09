@@ -235,13 +235,12 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
         ) : !studentProfile ? (
           <div className="space-y-4">
             <VerificationSummary verification={verification} />
-            <RegisterStudentCard
-              profileForm={profileForm}
-              setProfileForm={setProfileForm}
-              pending={actionPending}
-              verification={verification}
-              onSubmit={() => runAction(() => registerStudent(profileForm.name, profileForm.university))}
-            />
+            <Card>
+              <CardContent className="flex items-center gap-3 p-6">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground">Creating your on-chain profile from KTM data...</span>
+              </CardContent>
+            </Card>
           </div>
         ) : (
           <>
@@ -375,13 +374,12 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
       ) : !studentProfile ? (
         <div className="space-y-4">
           <VerificationSummary verification={verification} />
-          <RegisterStudentCard
-            profileForm={profileForm}
-            setProfileForm={setProfileForm}
-            pending={actionPending}
-            verification={verification}
-            onSubmit={() => runAction(() => registerStudent(profileForm.name, profileForm.university))}
-          />
+          <Card>
+            <CardContent className="flex items-center gap-3 p-6">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Creating your on-chain profile from KTM data...</span>
+            </CardContent>
+          </Card>
         </div>
       ) : (
         <div className="space-y-6">
