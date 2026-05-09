@@ -317,7 +317,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
             onSubmit={() => runAction(() => registerStudent(profileForm.name, profileForm.university))}
           />
         </div>
-      ) : (
+      ) : activeLoan ? (
         <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <Card>
             <CardHeader>
@@ -385,6 +385,75 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
             onRepay={() => activeLoan && runAction(() => repayLoan(activeLoan, parseDecimalAmount(repayAmount)))}
             pending={actionPending}
           />
+        </div>
+      ) : (
+        <div className="mx-auto max-w-lg space-y-6">
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+              <FileText className="h-10 w-10 text-slate-300" />
+              <div>
+                <p className="text-sm font-semibold text-[#111827]">No active loan</p>
+                <p className="text-xs text-slate-500">Create your first education loan request below.</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Create Loan Request</CardTitle>
+              <CardDescription>Stored on Solana as a CampusFi loan account.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Field label="Purpose">
+                <Input
+                  value={loanForm.purpose}
+                  onChange={(event) => setLoanForm({ ...loanForm, purpose: event.target.value })}
+                  className="h-10"
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Amount USDC">
+                  <Input
+                    type="number"
+                    min={50}
+                    max={300}
+                    value={loanForm.amount}
+                    onChange={(event) => setLoanForm({ ...loanForm, amount: Number(event.target.value) })}
+                    className="h-10"
+                  />
+                </Field>
+                <Field label="Term (months)">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={6}
+                    value={loanForm.termMonths}
+                    onChange={(event) => setLoanForm({ ...loanForm, termMonths: Number(event.target.value) })}
+                    className="h-10"
+                  />
+                </Field>
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium text-[#111827]">Interest Rate</Label>
+                  <div className="flex h-10 items-center rounded-sm border border-slate-200 bg-slate-50 px-3">
+                    <span className="font-mono text-sm text-[#111827]">{autoInterestRateBps} bps</span>
+                    <span className="ml-2 text-xs text-slate-500">
+                      ({(autoInterestRateBps / 100).toFixed(1)}%/month)
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Auto from your {reputationScore >= 75 ? "Low" : reputationScore >= 50 ? "Medium" : "High"} Risk tier
+                  </p>
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                disabled={Boolean(actionPending)}
+                onClick={() => runAction(() => createLoanRequest({ ...loanForm, interestRateBps: autoInterestRateBps }))}
+              >
+                {actionPending === "Creating loan request" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create On-Chain Loan
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       )}
 
