@@ -50,7 +50,6 @@ type StudentVerificationInsert = {
   ktm_file_path: string; ktm_file_name: string; credential_hash: string;
   ocr_text_preview: string; confidence: number;
   status: "verified" | "pending" | "rejected" | "failed"; verified_at: string | null;
-  student_name?: string; nim?: string; major?: string; university_name?: string;
 };
 
 type ExtractedFields = {
@@ -163,10 +162,6 @@ export default async function handler(
       wallet_address: walletAddress, student_email: email, university_domain: universityDomain,
       ktm_file_path: filePath, ktm_file_name: payload.fileName, credential_hash: credentialHash,
       ocr_text_preview: normalizedText.slice(0, 240), confidence, status: "verified", verified_at: verifiedAt,
-      student_name: extracted.studentName ?? undefined,
-      nim: extracted.nim ?? undefined,
-      major: extracted.major ?? undefined,
-      university_name: extracted.university ?? undefined,
     };
 
     const insertResult = await supabaseAdmin.from("student_verifications").insert(verification).select("id").single();
