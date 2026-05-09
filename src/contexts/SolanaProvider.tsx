@@ -16,8 +16,14 @@ export function SolanaProvider({ children }: SolanaProviderProps) {
 
   const wsEndpoint = useMemo(() => {
     const rpcFast = import.meta.env.VITE_RPCFAST_RPC_URL;
-    if (rpcFast) return rpcFast.replace("https://", "wss://");
-    return undefined;
+    if (!rpcFast) return undefined;
+    try {
+      const url = new URL(rpcFast);
+      url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+      return url.toString();
+    } catch {
+      return undefined;
+    }
   }, []);
 
   const wallets = useMemo(() => [], []);

@@ -86,7 +86,7 @@ export function AppDashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans flex flex-col md:flex-row">
-      <aside className="w-full border-b bg-card text-card-foreground md:w-72 md:border-b-0 md:border-r">
+      <aside className="w-full border-b bg-card text-card-foreground md:w-72 md:border-b-0 md:border-r md:flex md:flex-col md:h-screen md:sticky md:top-0">
         <div className="h-20 flex items-center px-6 border-b shrink-0">
           <Link to="/" className="flex items-center gap-2">
             <div className="h-11 w-11 overflow-hidden rounded-xl bg-black shadow-sm">
@@ -94,12 +94,11 @@ export function AppDashboard() {
             </div>
             <div>
               <span className="block font-bold text-lg leading-none tracking-tight">CampusFi</span>
-              <span className="text-xs text-muted-foreground">Devnet app</span>
             </div>
           </Link>
         </div>
 
-        <div className="p-4 flex-1 flex flex-col gap-1 md:min-h-[calc(100vh-5rem)]">
+        <div className="p-4 flex-1 flex flex-col gap-1 overflow-y-auto">
           <Card className="mb-5 border-primary/20 bg-primary/5">
             <CardContent className="space-y-3 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -108,17 +107,6 @@ export function AppDashboard() {
                   <div className="mt-1 text-sm font-semibold capitalize">{role}</div>
                 </div>
                 <Badge className="bg-primary text-primary-foreground">{role === "student" ? "Borrower" : "Lender"}</Badge>
-              </div>
-              <Separator />
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-lg border bg-background p-2">
-                  <div className="font-mono text-[9px] uppercase text-muted-foreground">Network</div>
-                  <div className="mt-1 font-semibold">Devnet</div>
-                </div>
-                <div className="rounded-lg border bg-background p-2">
-                  <div className="font-mono text-[9px] uppercase text-muted-foreground">Program</div>
-                  <div className="mt-1 font-semibold text-primary">Live</div>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -156,10 +144,6 @@ export function AppDashboard() {
           <div className="hidden min-w-0 md:block">
             <div className="flex items-center gap-2">
               <h2 className="truncate text-xl font-semibold text-foreground">{portalTitle}</h2>
-              <Badge variant="secondary" className="gap-1">
-                <ShieldCheck className="h-3 w-3" aria-hidden />
-                Devnet
-              </Badge>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">{portalDescription}</p>
           </div>

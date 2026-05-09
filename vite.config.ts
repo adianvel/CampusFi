@@ -45,9 +45,7 @@ export default defineConfig(({mode}) => {
         protocolImports: true,
       }),
     ],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
+    define: {},
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

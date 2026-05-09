@@ -19,4 +19,4 @@ cluster = "devnet"
 wallet = ".anchor/deploy-wallet.json"
 
 [scripts]
-test = "\"/mnt/c/Program Files/nodejs/node.exe\" --test tests/campusfi.test.js"
+test = "\"/mnt/c/Program Files/nodejs/node.exe\" --test tests/user-flow.test.js"

@@ -408,6 +408,63 @@
       "args": []
     },
     {
+      "name": "disburse_loan",
+      "docs": [
+        "Disburse funded loan to student wallet (transfers USDC from vault to student)"
+      ],
+      "discriminator": [
+        115,
+        159,
+        152,
+        253,
+        201,
+        29,
+        29,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "loan_request",
+          "writable": true
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true
+        },
+        {
+          "name": "student_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "student",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "fund_loan",
       "docs": [
         "Fund a loan (lender sends USDC to vault)"
@@ -753,6 +810,123 @@
       "args": []
     },
     {
+      "name": "update_credit_passport",
+      "docs": [
+        "Update credit passport after loan completion or default"
+      ],
+      "discriminator": [
+        87,
+        255,
+        210,
+        229,
+        50,
+        106,
+        158,
+        170
+      ],
+      "accounts": [
+        {
+          "name": "credit_passport",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  115,
+                  115,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "student_profile.authority",
+                "account": "StudentProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "student_profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  117,
+                  100,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "student_profile.authority",
+                "account": "StudentProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "completed",
+          "type": "bool"
+        },
+        {
+          "name": "defaulted",
+          "type": "bool"
+        },
+        {
+          "name": "on_time",
+          "type": "bool"
+        },
+        {
+          "name": "borrowed_amount",
+          "type": "u64"
+        },
+        {
+          "name": "repaid_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "update_reputation",
       "docs": [
         "Update student reputation score (admin-only)"
@@ -825,6 +999,19 @@
     }
   ],
   "accounts": [
+    {
+      "name": "CreditPassport",
+      "discriminator": [
+        11,
+        205,
+        70,
+        128,
+        178,
+        191,
+        178,
+        197
+      ]
+    },
     {
       "name": "LoanFunding",
       "discriminator": [
@@ -958,9 +1145,66 @@
       "code": 6015,
       "name": "InvalidVault",
       "msg": "Invalid protocol vault token account"
+    },
+    {
+      "code": 6016,
+      "name": "LoanNotDisbursable",
+      "msg": "Loan is not ready for disbursement"
     }
   ],
   "types": [
+    {
+      "name": "CreditPassport",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "student",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_loans",
+            "type": "u16"
+          },
+          {
+            "name": "completed_loans",
+            "type": "u16"
+          },
+          {
+            "name": "defaulted_loans",
+            "type": "u16"
+          },
+          {
+            "name": "total_borrowed",
+            "type": "u64"
+          },
+          {
+            "name": "total_repaid",
+            "type": "u64"
+          },
+          {
+            "name": "on_time_payments",
+            "type": "u16"
+          },
+          {
+            "name": "late_payments",
+            "type": "u16"
+          },
+          {
+            "name": "credit_score",
+            "type": "u16"
+          },
+          {
+            "name": "last_updated",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
     {
       "name": "LoanFunding",
       "type": {

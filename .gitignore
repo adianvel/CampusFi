@@ -36,41 +36,43 @@ program-keypair.json
 *-keypair.json
 id.json
 
-# Generated import / backup folders
-archive/
-image.png
-*.tmp
-*.bak
-
-# Local planning and product docs
-implementation_plan.md
-implementation_plan.mdc
-CampusFi-PRD.md
-CampusFi-PRD.mdc
-brand.md
-CLAUDE.md
-CODEX_CONTEXT.md
-CODEX-COMPACT.md
+# Sensitive docs
+*key*.md
+*secret*.md
+*password*.md
 paddleocr.md
 supabase-key.md
 postgre.md
 walletdeploy.md
 rpcfast.md
-*key*.md
-*secret*.md
-*password*.md
+
+# Local planning docs
+implementation_plan.md
+CampusFi-PRD.md
+brand.md
+CLAUDE.md
+CODEX_CONTEXT.md
+CODEX-COMPACT.md
+SESSION.md
+skills-lock.json
+
+# Generated / backup
+archive/
+image.png
+*.tmp
+*.bak
 
 # Tooling and local agent state
 .agents/
 .claude/
 .superstack/
+.kiro/
 supabase/.temp/
 
 # OS and editor files
 .DS_Store
 Thumbs.db
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 .idea/
 *.suo
 *.ntvs*

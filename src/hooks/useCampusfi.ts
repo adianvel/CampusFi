@@ -6,6 +6,7 @@ import {
   USDC_MINT,
   formatUsdc,
   createCampusfiProgram,
+  creditPassportPda,
   loanFundingPda,
   loanRequestPda,
   maybeCreateAtaInstruction,
@@ -17,6 +18,7 @@ import {
   type LoanFundingData,
   type LoanRequestData,
   type StudentProfileData,
+  type CreditPassportData,
 } from "@/src/lib/campusfiClient";
 import { getAccount, getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
@@ -42,6 +44,7 @@ export function useCampusfi() {
   const wallet = useWallet();
   const { connection } = useConnection();
   const [studentProfile, setStudentProfile] = useState<StudentProfileData | null>(null);
+  const [creditPassport, setCreditPassport] = useState<CreditPassportData | null>(null);
   const [studentLoans, setStudentLoans] = useState<LoanRequestData[]>([]);
   const [marketplaceLoans, setMarketplaceLoans] = useState<LoanRequestData[]>([]);
   const [lenderFundings, setLenderFundings] = useState<LoanFundingData[]>([]);
@@ -70,6 +73,7 @@ export function useCampusfi() {
   const refresh = useCallback(async () => {
     if (!program || !wallet.publicKey) {
       setStudentProfile(null);
+      setCreditPassport(null);
       setStudentLoans([]);
       setMarketplaceLoans([]);
       setLenderFundings([]);
@@ -95,6 +99,26 @@ export function useCampusfi() {
         });
       } catch {
         setStudentProfile(null);
+      }
+
+      try {
+        const passportPda = creditPassportPda(wallet.publicKey);
+        const passport = await program.account.creditPassport.fetch(passportPda);
+        setCreditPassport({
+          publicKey: passportPda,
+          student: passport.student,
+          totalLoans: passport.totalLoans,
+          completedLoans: passport.completedLoans,
+          defaultedLoans: passport.defaultedLoans,
+          totalBorrowed: passport.totalBorrowed,
+          totalRepaid: passport.totalRepaid,
+          onTimePayments: passport.onTimePayments,
+          latePayments: passport.latePayments,
+          creditScore: passport.creditScore,
+          lastUpdated: passport.lastUpdated,
+        });
+      } catch {
+        setCreditPassport(null);
       }
 
       const allLoans = (await program.account.loanRequest.all()).map((item) => ({
@@ -246,6 +270,59 @@ export function useCampusfi() {
 
         await refresh();
         return sig;
+      } catch (err) {
+        setError(normalizeError(err));
+        throw err;
+      } finally {
+        setActionPending(null);
+      }
+    },
+    [connection, program, refresh, wallet.publicKey, wallet.sendTransaction],
+  );
+
+  const disburseLoan = useCallback(
+    async (loan: LoanRequestData) => {
+      if (!program || !wallet.publicKey) throw new Error("Connect wallet first");
+      if (!wallet.sendTransaction) throw new Error("Wallet cannot send transactions");
+      setActionPending("Disbursing loan");
+      setError(null);
+      try {
+        const studentTokenAccount = await getAssociatedTokenAddress(USDC_MINT, wallet.publicKey);
+        const { ata: vaultTokenAccount, instruction: createStudentAtaInstruction } = await maybeCreateAtaInstruction(
+          connection,
+          wallet.publicKey,
+          USDC_MINT,
+          wallet.publicKey,
+        );
+        const vaultAta = (await maybeCreateAtaInstruction(
+          connection,
+          wallet.publicKey,
+          USDC_MINT,
+          vaultAuthorityPda(),
+          true,
+        )).ata;
+
+        await program.methods
+          .disburseLoan()
+          .accounts({
+            loanRequest: loan.publicKey,
+            vaultTokenAccount: vaultAta,
+            studentTokenAccount,
+            vaultAuthority: vaultAuthorityPda(),
+            student: wallet.publicKey,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          } as never)
+          .preInstructions(createStudentAtaInstruction ? [createStudentAtaInstruction] : [])
+          .rpc();
+
+        setStudentLoans((prev) =>
+          prev.map((l) => l.publicKey.equals(loan.publicKey) ? { ...l, status: 2 } : l),
+        );
+        setMarketplaceLoans((prev) =>
+          prev.map((l) => l.publicKey.equals(loan.publicKey) ? { ...l, status: 2 } : l),
+        );
+
+        await refresh();
       } catch (err) {
         setError(normalizeError(err));
         throw err;
@@ -468,6 +545,7 @@ export function useCampusfi() {
     actionPending,
     error,
     studentProfile,
+    creditPassport,
     studentLoans,
     marketplaceLoans,
     lenderFundings,
@@ -475,6 +553,7 @@ export function useCampusfi() {
     registerStudent,
     createLoanRequest,
     fundLoan,
+    disburseLoan,
     repayLoan,
     claimReturns,
     delegateStudentProfile,

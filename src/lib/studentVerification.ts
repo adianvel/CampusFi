@@ -64,7 +64,12 @@ export async function createCredentialHash(email: string, file: File) {
     .join("");
 }
 
-export async function verifyStudentCredential(email: string, ktmFile: File, walletAddress: string) {
+export async function verifyStudentCredential(
+  email: string,
+  ktmFile: File,
+  walletAddress: string,
+  signMessage?: (message: Uint8Array) => Promise<Uint8Array>,
+) {
   if (!isStudentEmail(email)) {
     throw new Error("Use a valid Indonesian student email ending in .ac.id.");
   }
@@ -75,6 +80,16 @@ export async function verifyStudentCredential(email: string, ktmFile: File, wall
 
   if (!ktmFile.type.startsWith("image/") && ktmFile.type !== "application/pdf") {
     throw new Error("Upload a KTM image or PDF file.");
+  }
+
+  let signature: string | undefined;
+  let message: string | undefined;
+
+  if (signMessage) {
+    message = `CampusFi verification: ${walletAddress} at ${Date.now()}`;
+    const msgBytes = new TextEncoder().encode(message);
+    const sigBytes = await signMessage(msgBytes);
+    signature = btoa(String.fromCharCode(...sigBytes));
   }
 
   const response = await fetch("/api/ocr/verify-student", {
@@ -89,6 +104,8 @@ export async function verifyStudentCredential(email: string, ktmFile: File, wall
       mimeType: ktmFile.type,
       fileType: ktmFile.type === "application/pdf" ? 0 : 1,
       fileBase64: await fileToBase64(ktmFile),
+      signature,
+      message,
     }),
   });
 

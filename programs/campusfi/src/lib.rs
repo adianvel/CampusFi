@@ -126,6 +126,30 @@ pub mod campusfi {
         Ok(())
     }
 
+    /// Disburse funded loan to student wallet (transfers USDC from vault to student)
+    pub fn disburse_loan(ctx: Context<DisburseLoan>) -> Result<()> {
+        let loan = &mut ctx.accounts.loan_request;
+        require!(loan.status == LoanStatus::Active as u8, CampusfiError::LoanNotDisbursable);
+        require!(loan.funded_amount >= loan.amount, CampusfiError::LoanNotDisbursable);
+
+        let vault_bump = ctx.bumps.vault_authority;
+        let signer_seeds: &[&[&[u8]]] = &[&[b"vault", &[vault_bump]]];
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.vault_token_account.to_account_info(),
+            to: ctx.accounts.student_token_account.to_account_info(),
+            authority: ctx.accounts.vault_authority.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            cpi_accounts,
+            signer_seeds,
+        );
+        token::transfer(cpi_ctx, loan.amount)?;
+
+        loan.status = LoanStatus::Repaying as u8;
+        Ok(())
+    }
+
     /// Repay a loan installment (student sends USDC)
     pub fn repay_installment(
         ctx: Context<RepayInstallment>,
@@ -133,7 +157,7 @@ pub mod campusfi {
     ) -> Result<()> {
         let loan = &mut ctx.accounts.loan_request;
         require!(
-            loan.status == LoanStatus::Active as u8 || loan.status == LoanStatus::Repaying as u8,
+            loan.status == LoanStatus::Repaying as u8,
             CampusfiError::LoanNotRepayable
         );
 
@@ -204,6 +228,57 @@ pub mod campusfi {
         require!(new_score <= 1000, CampusfiError::InvalidReputationScore);
         let profile = &mut ctx.accounts.student_profile;
         profile.reputation_score = new_score;
+        Ok(())
+    }
+
+    /// Update credit passport after loan completion or default
+    pub fn update_credit_passport(
+        ctx: Context<UpdateCreditPassport>,
+        completed: bool,
+        defaulted: bool,
+        on_time: bool,
+        borrowed_amount: u64,
+        repaid_amount: u64,
+    ) -> Result<()> {
+        let passport = &mut ctx.accounts.credit_passport;
+
+        if passport.student == Pubkey::default() {
+            passport.student = ctx.accounts.student_profile.authority;
+            passport.credit_score = 500;
+            passport.bump = ctx.bumps.credit_passport;
+        }
+
+        passport.total_loans += 1;
+        passport.total_borrowed = passport.total_borrowed.saturating_add(borrowed_amount);
+        passport.total_repaid = passport.total_repaid.saturating_add(repaid_amount);
+
+        if completed {
+            passport.completed_loans += 1;
+        }
+        if defaulted {
+            passport.defaulted_loans += 1;
+        }
+        if on_time {
+            passport.on_time_payments += 1;
+        } else {
+            passport.late_payments += 1;
+        }
+
+        // Recalculate credit score (0-1000)
+        let base: u16 = 500;
+        let completion_bonus = (passport.completed_loans as u32 * 50).min(200) as u16;
+        let on_time_bonus = (passport.on_time_payments as u32 * 20).min(200) as u16;
+        let default_penalty = (passport.defaulted_loans as u32 * 150).min(400) as u16;
+        let late_penalty = (passport.late_payments as u32 * 30).min(150) as u16;
+
+        passport.credit_score = base
+            .saturating_add(completion_bonus)
+            .saturating_add(on_time_bonus)
+            .saturating_sub(default_penalty)
+            .saturating_sub(late_penalty)
+            .min(1000);
+
+        passport.last_updated = Clock::get()?.unix_timestamp;
         Ok(())
     }
 
@@ -390,6 +465,31 @@ pub struct FundLoan<'info> {
 }
 
 #[derive(Accounts)]
+pub struct DisburseLoan<'info> {
+    #[account(
+        mut,
+        constraint = loan_request.student == student.key() @ CampusfiError::Unauthorized,
+    )]
+    pub loan_request: Account<'info, LoanRequest>,
+    #[account(
+        mut,
+        constraint = vault_token_account.owner == vault_authority.key() @ CampusfiError::InvalidVault,
+    )]
+    pub vault_token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub student_token_account: Account<'info, TokenAccount>,
+    /// CHECK: PDA token authority for the protocol vault.
+    #[account(
+        seeds = [b"vault"],
+        bump,
+    )]
+    pub vault_authority: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub student: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
 pub struct RepayInstallment<'info> {
     #[account(
         mut,
@@ -459,6 +559,32 @@ pub struct UpdateReputation<'info> {
     )]
     pub config: Account<'info, ProtocolConfig>,
     pub admin: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateCreditPassport<'info> {
+    #[account(
+        init_if_needed,
+        payer = admin,
+        space = 8 + 32 + 2 + 2 + 2 + 8 + 8 + 2 + 2 + 2 + 8 + 1,
+        seeds = [b"passport", student_profile.authority.as_ref()],
+        bump,
+    )]
+    pub credit_passport: Account<'info, CreditPassport>,
+    #[account(
+        seeds = [b"student", student_profile.authority.as_ref()],
+        bump = student_profile.bump,
+    )]
+    pub student_profile: Account<'info, StudentProfile>,
+    #[account(
+        seeds = [b"config"],
+        bump = config.bump,
+        constraint = config.admin == admin.key() @ CampusfiError::Unauthorized,
+    )]
+    pub config: Account<'info, ProtocolConfig>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[delegate]
@@ -532,6 +658,21 @@ pub struct LoanFunding {
     pub bump: u8,
 }
 
+#[account]
+pub struct CreditPassport {
+    pub student: Pubkey,
+    pub total_loans: u16,
+    pub completed_loans: u16,
+    pub defaulted_loans: u16,
+    pub total_borrowed: u64,
+    pub total_repaid: u64,
+    pub on_time_payments: u16,
+    pub late_payments: u16,
+    pub credit_score: u16,
+    pub last_updated: i64,
+    pub bump: u8,
+}
+
 /* ─── Enums ─── */
 
 #[repr(u8)]
@@ -579,4 +720,6 @@ pub enum CampusfiError {
     NothingToClaim,
     #[msg("Invalid protocol vault token account")]
     InvalidVault,
+    #[msg("Loan is not ready for disbursement")]
+    LoanNotDisbursable,
 }

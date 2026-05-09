@@ -8,6 +8,12 @@ declare module '*.png' {
   export default value;
 }
 
+declare module 'cors' {
+  import type { RequestHandler } from 'express';
+  function cors(): RequestHandler;
+  export default cors;
+}
+
 interface ImportMetaEnv {
   readonly VITE_HELIUS_RPC_URL?: string;
   readonly VITE_RPCFAST_RPC_URL?: string;

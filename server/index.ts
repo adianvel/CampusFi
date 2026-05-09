@@ -4,6 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
 import type { Server } from "node:http";
 import { isSupabaseConfigured, studentKtmBucket, supabaseAdmin, type StudentVerificationInsert } from "./supabase";
 
@@ -14,7 +16,14 @@ const preferredPort = Number(process.env.PORT || 3000);
 
 const app = express();
 
+app.use(cors());
 app.use(express.json({ limit: "16mb" }));
+
+const ocrLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: { error: "Too many verification requests. Try again in a minute." },
+});
 
 type VerifyStudentRequest = {
   email?: string;
@@ -74,20 +83,40 @@ app.get("/api/student-verification", async (request, response) => {
     confidence: data.confidence === null ? undefined : Number(data.confidence),
     ocrTextPreview: data.ocr_text_preview ?? undefined,
     verifiedAt: data.verified_at ?? undefined,
+    ...(data.ocr_text_preview ? extractKtmFields(data.ocr_text_preview) : {}),
   });
 });
 
-app.post("/api/ocr/verify-student", async (request, response) => {
-  const { email, walletAddress, fileName, mimeType, fileType, fileBase64 } = request.body as VerifyStudentRequest;
+app.post("/api/ocr/verify-student", ocrLimiter, async (request, response) => {
+  const { email, walletAddress, fileName, mimeType, fileType, fileBase64, signature, message } = request.body as VerifyStudentRequest & { signature?: string; message?: string };
   const normalizedEmail = email?.trim().toLowerCase() ?? "";
   const normalizedWalletAddress = walletAddress?.trim() ?? "";
 
-  if (!/^[^\s@]+@[^\s@]+\.ac\.id$/i.test(normalizedEmail)) {
-    return response.status(400).json({ error: "Use a valid Indonesian student email ending in .ac.id." });
-  }
-
   if (!normalizedWalletAddress) {
     return response.status(400).json({ error: "Connect your wallet before verifying student status." });
+  }
+
+  // Verify wallet ownership via signed message
+  if (!signature || !message) {
+    return response.status(401).json({ error: "Wallet signature required for verification." });
+  }
+
+  try {
+    const { PublicKey } = await import("@solana/web3.js");
+    const nacl = await import("tweetnacl");
+    const pubkey = new PublicKey(normalizedWalletAddress);
+    const msgBytes = new TextEncoder().encode(message);
+    const sigBytes = Buffer.from(signature, "base64");
+    const valid = nacl.default.sign.detached.verify(msgBytes, sigBytes, pubkey.toBytes());
+    if (!valid) {
+      return response.status(401).json({ error: "Invalid wallet signature." });
+    }
+  } catch {
+    return response.status(401).json({ error: "Wallet signature verification failed." });
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.ac\.id$/i.test(normalizedEmail)) {
+    return response.status(400).json({ error: "Use a valid Indonesian student email ending in .ac.id." });
   }
 
   if (!fileBase64 || !fileName || (fileType !== 0 && fileType !== 1)) {
@@ -146,6 +175,8 @@ app.post("/api/ocr/verify-student", async (request, response) => {
       return response.status(422).json({ error: "OCR could not read enough KTM text. Upload a clearer image." });
     }
 
+    const extracted = extractKtmFields(normalizedText);
+
     const credentialHash = crypto
       .createHash("sha256")
       .update(normalizedEmail)
@@ -191,6 +222,10 @@ app.post("/api/ocr/verify-student", async (request, response) => {
       confidence,
       ocrTextPreview: normalizedText.slice(0, 240),
       verifiedAt,
+      studentName: extracted.studentName,
+      nim: extracted.nim,
+      university: extracted.university,
+      major: extracted.major,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "PaddleOCR verification failed.";
@@ -268,6 +303,28 @@ function estimateConfidence(text: string) {
   if (hasStudentKeyword && hasDigits) return 0.9;
   if (hasStudentKeyword || hasDigits) return 0.76;
   return 0.62;
+}
+
+function extractKtmFields(ocrText: string) {
+  const nimPattern = /(nim|npm|no\.?\s*induk|nomor induk|student\s*id)\s*:?\s*(\d{8,15})/i;
+  const standaloneNim = /\b(\d{9,12})\b/;
+  const nimMatch = nimPattern.exec(ocrText);
+  const looseNim = standaloneNim.exec(ocrText);
+  const nim = nimMatch?.[2] ?? looseNim?.[1] ?? null;
+
+  let university: string | null = null;
+  const uniMatch = ocrText.match(/(?:universitas|institut|politeknik|sekolah tinggi|akademi)\s+[A-Za-z\s.]+/i);
+  if (uniMatch) university = uniMatch[0].trim();
+
+  let studentName: string | null = null;
+  const nameMatch = ocrText.match(/(?:nama|name)\s*:?\s*([A-Za-z\s]{4,40})/i);
+  if (nameMatch) studentName = nameMatch[1].trim();
+
+  let major: string | null = null;
+  const majorMatch = ocrText.match(/(?:program studi|prodi|jurusan|major)\s*:?\s*([A-Za-z\s.,&-]{4,60})/i);
+  if (majorMatch) major = majorMatch[1].trim();
+
+  return { studentName, nim, university, major };
 }
 
 if (isProduction) {

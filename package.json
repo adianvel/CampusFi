@@ -11,7 +11,8 @@
     "supabase:setup": "tsx scripts/setup-supabase.ts",
     "anchor:build": "anchor build",
     "anchor:test": "anchor test",
-    "anchor:test:wsl": "anchor test --skip-local-validator"
+    "anchor:test:wsl": "anchor test --skip-local-validator",
+    "test:flow": "node --test tests/user-flow.test.js"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",

@@ -1,4 +1,5 @@
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { AlertCircle, CheckCircle2, FileText, IdCard, Loader2, RefreshCw, ScanLine, ShieldCheck, Upload, Zap } from "lucide-react";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
@@ -9,7 +10,7 @@ import { Label } from "@/src/components/ui/label";
 import { Progress } from "@/src/components/ui/progress";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { useCampusfi } from "@/src/hooks/useCampusfi";
-import { formatUsdc, getLoanStatus, getRiskTier, totalOwed } from "@/src/lib/campusfiClient";
+import { computeRepaymentSchedule, formatUsdc, getLoanStatus, getRiskTier, totalOwed } from "@/src/lib/campusfiClient";
 import {
   getStudentVerification,
   loadStudentVerification,
@@ -26,15 +27,18 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
     actionPending,
     error,
     studentProfile,
+    creditPassport,
     studentLoans,
     registerStudent,
     createLoanRequest,
+    disburseLoan,
     repayLoan,
     refresh,
     delegateStudentProfile,
     commitStudentProfile,
     undelegateStudentProfile,
   } = useCampusfi();
+  const { signMessage } = useWallet();
   const [profileForm, setProfileForm] = useState({
     name: "",
     university: "",
@@ -53,7 +57,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [verificationLoading, setVerificationLoading] = useState(true);
 
-  const activeLoan = useMemo(() => studentLoans[0] ?? null, [studentLoans]);
+  const activeLoans = useMemo(() => studentLoans.filter((l) => l.status < 3), [studentLoans]);
   const reputationScore = studentProfile ? Math.round(studentProfile.reputationScore / 10) : 0;
 
   const autoInterestRateBps = useMemo(() => {
@@ -71,14 +75,14 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
     }
 
     const cachedVerification = loadStudentVerification(walletAddress);
-    if (cachedVerification) {
+    if (cachedVerification && cachedVerification.studentName) {
       setVerification(cachedVerification);
       setVerificationEmail(cachedVerification.email);
       setVerificationLoading(false);
       return;
     }
 
-    setVerificationLoading(false);
+    setVerificationLoading(true);
 
     let isMounted = true;
 
@@ -86,7 +90,13 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
       .then((restoredVerification) => {
         if (!isMounted) return;
         if (!restoredVerification || restoredVerification.status !== "verified") {
-          setVerification(null);
+          if (cachedVerification) {
+            setVerification(cachedVerification);
+            setVerificationEmail(cachedVerification.email);
+          } else {
+            setVerification(null);
+          }
+          setVerificationLoading(false);
           return;
         }
         saveStudentVerification(restoredVerification, walletAddress);
@@ -97,10 +107,16 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
           name: restoredVerification.studentName || current.name,
           university: restoredVerification.university || restoredVerification.universityDomain.replace(".ac.id", "").toUpperCase() || current.university,
         }));
+        setVerificationLoading(false);
       })
       .catch((err) => {
         if (!isMounted) return;
-        setVerification(null);
+        if (cachedVerification) {
+          setVerification(cachedVerification);
+          setVerificationEmail(cachedVerification.email);
+        } else {
+          setVerification(null);
+        }
         setVerificationLoading(false);
         setVerificationError(err instanceof Error ? err.message : "Could not restore student verification.");
       });
@@ -130,7 +146,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
 
     setVerificationPending(true);
     try {
-      const result = await verifyStudentCredential(verificationEmail, ktmFile, publicKey?.toBase58() ?? "");
+      const result = await verifyStudentCredential(verificationEmail, ktmFile, publicKey?.toBase58() ?? "", signMessage ?? undefined);
       saveStudentVerification(result, publicKey?.toBase58());
       setVerification(result);
       setProfileForm((current) => ({
@@ -238,14 +254,15 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
               <CardHeader>
                 <CardTitle>{verification?.studentName || studentProfile.name}</CardTitle>
                 <CardDescription>
-                  {verification?.nim ? `${verification.nim}  ·  ` : ""}
-                  {verification?.university || studentProfile.university}
+                  {verification?.nim ? `NIM: ${verification.nim}  ·  ` : ""}
+                  {verification?.university || verification?.universityDomain?.replace(".ac.id", "").toUpperCase() || studentProfile.university}
                   {verification?.major ? `  ·  ${verification.major}` : ""}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
                   ["Status", "KTM Verified + On-chain"],
+                  ["Email", verification?.email || "—"],
                   ["Loans created", String(studentProfile.loansCount)],
                   ["Wallet authority", studentProfile.authority.toBase58().slice(0, 8) + "..."],
                   ["Repayment history", studentLoans.length ? "On-chain loan found" : "No repayment history yet"],
@@ -261,6 +278,45 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
               </CardContent>
             </Card>
           </div>
+
+          {creditPassport && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Credit Passport</CardTitle>
+                <CardDescription>On-chain repayment history and credit score.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <div className="rounded-md border p-3 text-center">
+                    <div className="text-2xl font-bold text-[#3B82F6]">{creditPassport.creditScore}</div>
+                    <div className="text-[10px] uppercase text-slate-500">Credit Score</div>
+                  </div>
+                  <div className="rounded-md border p-3 text-center">
+                    <div className="text-2xl font-bold text-emerald-600">{creditPassport.completedLoans}</div>
+                    <div className="text-[10px] uppercase text-slate-500">Completed</div>
+                  </div>
+                  <div className="rounded-md border p-3 text-center">
+                    <div className="text-2xl font-bold text-slate-800">{creditPassport.onTimePayments}</div>
+                    <div className="text-[10px] uppercase text-slate-500">On-time</div>
+                  </div>
+                  <div className="rounded-md border p-3 text-center">
+                    <div className="text-2xl font-bold text-red-500">{creditPassport.defaultedLoans}</div>
+                    <div className="text-[10px] uppercase text-slate-500">Defaults</div>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
+                  <div className="flex justify-between rounded-sm border px-3 py-2">
+                    <span className="text-slate-500">Total borrowed</span>
+                    <span className="font-mono">{(creditPassport.totalBorrowed.toNumber() / 1_000_000).toFixed(2)} USDC</span>
+                  </div>
+                  <div className="flex justify-between rounded-sm border px-3 py-2">
+                    <span className="text-slate-500">Total repaid</span>
+                    <span className="font-mono">{(creditPassport.totalRepaid.toNumber() / 1_000_000).toFixed(2)} USDC</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <MagicBlockCard
             pending={actionPending}
@@ -317,143 +373,124 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
             onSubmit={() => runAction(() => registerStudent(profileForm.name, profileForm.university))}
           />
         </div>
-      ) : activeLoan ? (
-        <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          <Card>
-            <CardHeader>
-              <CardTitle>Create Loan Request</CardTitle>
-              <CardDescription>Stored on Solana as a CampusFi loan account.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Field label="Purpose">
-                <Input
-                  value={loanForm.purpose}
-                  onChange={(event) => setLoanForm({ ...loanForm, purpose: event.target.value })}
-                  className="h-10"
-                />
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <Field label="Amount USDC">
-                  <Input
-                    type="number"
-                    min={50}
-                    max={300}
-                    value={loanForm.amount}
-                    onChange={(event) => setLoanForm({ ...loanForm, amount: Number(event.target.value) })}
-                    className="h-10"
-                  />
-                </Field>
-                <Field label="Term (months)">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={6}
-                    value={loanForm.termMonths}
-                    onChange={(event) => setLoanForm({ ...loanForm, termMonths: Number(event.target.value) })}
-                    className="h-10"
-                  />
-                </Field>
-                <div className="space-y-1">
-                  <Label className="text-sm font-medium text-[#111827]">Interest Rate</Label>
-                  <div className="flex h-10 items-center rounded-sm border border-slate-200 bg-slate-50 px-3">
-                    <span className="font-mono text-sm text-[#111827]">{autoInterestRateBps} bps</span>
-                    <span className="ml-2 text-xs text-slate-500">
-                      ({(autoInterestRateBps / 100).toFixed(1)}%/month)
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-slate-400">
-                    Auto from your {reputationScore >= 75 ? "Low" : reputationScore >= 50 ? "Medium" : "High"} Risk tier
-                  </p>
-                </div>
-              </div>
-              <Button
-                className="w-full"
-                disabled={Boolean(actionPending)}
-                onClick={() => runAction(() => createLoanRequest({ ...loanForm, interestRateBps: autoInterestRateBps }))}
-              >
-                {actionPending === "Creating loan request" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create On-Chain Loan
-              </Button>
-            </CardContent>
-          </Card>
-
-          <LoanCard
-            loan={activeLoan}
-            loading={loading}
-            repayAmount={repayAmount}
-            setRepayAmount={setRepayAmount}
-            onRepay={() => activeLoan && runAction(() => repayLoan(activeLoan, parseDecimalAmount(repayAmount)))}
-            pending={actionPending}
-          />
-        </div>
       ) : (
-        <div className="mx-auto max-w-lg space-y-6">
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-              <FileText className="h-10 w-10 text-slate-300" />
-              <div>
-                <p className="text-sm font-semibold text-[#111827]">No active loan</p>
-                <p className="text-xs text-slate-500">Create your first education loan request below.</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Create Loan Request</CardTitle>
-              <CardDescription>Stored on Solana as a CampusFi loan account.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Field label="Purpose">
-                <Input
-                  value={loanForm.purpose}
-                  onChange={(event) => setLoanForm({ ...loanForm, purpose: event.target.value })}
-                  className="h-10"
-                />
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <Field label="Amount USDC">
+        <div className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create Loan Request</CardTitle>
+                <CardDescription>Stored on Solana as a CampusFi loan account.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Field label="Purpose">
                   <Input
-                    type="number"
-                    min={50}
-                    max={300}
-                    value={loanForm.amount}
-                    onChange={(event) => setLoanForm({ ...loanForm, amount: Number(event.target.value) })}
+                    value={loanForm.purpose}
+                    onChange={(event) => setLoanForm({ ...loanForm, purpose: event.target.value })}
                     className="h-10"
                   />
                 </Field>
-                <Field label="Term (months)">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={6}
-                    value={loanForm.termMonths}
-                    onChange={(event) => setLoanForm({ ...loanForm, termMonths: Number(event.target.value) })}
-                    className="h-10"
-                  />
-                </Field>
-                <div className="space-y-1">
-                  <Label className="text-sm font-medium text-[#111827]">Interest Rate</Label>
-                  <div className="flex h-10 items-center rounded-sm border border-slate-200 bg-slate-50 px-3">
-                    <span className="font-mono text-sm text-[#111827]">{autoInterestRateBps} bps</span>
-                    <span className="ml-2 text-xs text-slate-500">
-                      ({(autoInterestRateBps / 100).toFixed(1)}%/month)
-                    </span>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field label="Amount USDC">
+                    <Input
+                      type="number"
+                      min={50}
+                      max={300}
+                      value={loanForm.amount}
+                      onChange={(event) => setLoanForm({ ...loanForm, amount: Number(event.target.value) })}
+                      className="h-10"
+                    />
+                  </Field>
+                  <Field label="Term (months)">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={6}
+                      value={loanForm.termMonths}
+                      onChange={(event) => setLoanForm({ ...loanForm, termMonths: Number(event.target.value) })}
+                      className="h-10"
+                    />
+                  </Field>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium text-[#111827]">Interest Rate</Label>
+                    <div className="flex h-10 items-center rounded-sm border border-slate-200 bg-slate-50 px-3">
+                      <span className="font-mono text-sm text-[#111827]">{autoInterestRateBps} bps</span>
+                      <span className="ml-2 text-xs text-slate-500">
+                        ({(autoInterestRateBps / 100).toFixed(1)}%/month)
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Auto from your {reputationScore >= 75 ? "Low" : reputationScore >= 50 ? "Medium" : "High"} Risk tier
+                    </p>
                   </div>
-                  <p className="text-[10px] text-slate-400">
-                    Auto from your {reputationScore >= 75 ? "Low" : reputationScore >= 50 ? "Medium" : "High"} Risk tier
-                  </p>
                 </div>
-              </div>
-              <Button
-                className="w-full"
-                disabled={Boolean(actionPending)}
-                onClick={() => runAction(() => createLoanRequest({ ...loanForm, interestRateBps: autoInterestRateBps }))}
-              >
-                {actionPending === "Creating loan request" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create On-Chain Loan
-              </Button>
-            </CardContent>
-          </Card>
+                <Button
+                  className="w-full"
+                  disabled={Boolean(actionPending)}
+                  onClick={() => runAction(() => createLoanRequest({ ...loanForm, interestRateBps: autoInterestRateBps }))}
+                >
+                  {actionPending === "Creating loan request" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Create On-Chain Loan
+                </Button>
+              </CardContent>
+            </Card>
+
+            {activeLoans.length === 0 && (
+              <Card className="border-dashed flex items-center justify-center">
+                <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+                  <FileText className="h-10 w-10 text-slate-300" />
+                  <div>
+                    <p className="text-sm font-semibold text-[#111827]">No active loan</p>
+                    <p className="text-xs text-slate-500">Create your first education loan request.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {activeLoans.map((loan) => (
+            <LoanCard
+              key={loan.publicKey.toBase58()}
+              loan={loan}
+              loading={loading}
+              repayAmount={repayAmount}
+              setRepayAmount={setRepayAmount}
+              onRepay={() => runAction(() => repayLoan(loan, parseDecimalAmount(repayAmount)))}
+              onDisburse={() => runAction(() => disburseLoan(loan))}
+              pending={actionPending}
+            />
+          ))}
+        </div>
+      )}
+
+      {studentLoans.filter((l) => l.status >= 3).length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold text-[#111827]">Loan History</h3>
+          <div className="rounded-md border border-slate-200 overflow-hidden">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium">Purpose</th>
+                  <th className="px-4 py-2 text-right font-medium">Amount</th>
+                  <th className="px-4 py-2 text-right font-medium">Repaid</th>
+                  <th className="px-4 py-2 text-right font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {studentLoans.filter((l) => l.status >= 3).map((loan) => (
+                  <tr key={loan.publicKey.toBase58()} className="border-t border-slate-100">
+                    <td className="px-4 py-2 text-slate-800">{loan.purpose}</td>
+                    <td className="px-4 py-2 text-right font-mono">{formatUsdc(loan.amount).toFixed(2)} USDC</td>
+                    <td className="px-4 py-2 text-right font-mono">{formatUsdc(loan.repaidAmount).toFixed(2)} USDC</td>
+                    <td className="px-4 py-2 text-right">
+                      <Badge variant={loan.status === 3 ? "success" : "destructive"}>
+                        {getLoanStatus(loan.status)}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -672,6 +709,7 @@ function LoanCard({
   repayAmount,
   setRepayAmount,
   onRepay,
+  onDisburse,
   pending,
 }: {
   loan: ReturnType<typeof useCampusfi>["studentLoans"][number] | null;
@@ -679,6 +717,7 @@ function LoanCard({
   repayAmount: string;
   setRepayAmount: (value: string) => void;
   onRepay: () => void;
+  onDisburse: () => void;
   pending: string | null;
 }) {
   if (loading) {
@@ -715,18 +754,21 @@ function LoanCard({
   const total = totalOwed(loan);
   const remaining = Math.max(total - loan.repaidAmount.toNumber(), 0);
   const parsedRepayAmount = parseDecimalAmount(repayAmount);
+  const isActive = status === "Active";
   const repayDisabledReason =
     status === "Pending"
       ? `Loan must be fully funded before repayment. Current funding: ${formatUsdc(loan.fundedAmount).toFixed(2)} / ${formatUsdc(loan.amount).toFixed(2)} USDC.`
-      : status === "Completed"
-        ? "Loan is already completed."
-          : repayAmount.trim() === "" || parsedRepayAmount <= 0
-            ? "Enter a repay amount."
-          : parsedRepayAmount > remaining / 1_000_000
-            ? "Repay amount exceeds the remaining balance."
-            : pending
-              ? pending
-              : null;
+      : status === "Active"
+        ? "Disburse the loan to your wallet first."
+        : status === "Completed"
+          ? "Loan is already completed."
+            : repayAmount.trim() === "" || parsedRepayAmount <= 0
+              ? "Enter a repay amount."
+            : parsedRepayAmount > remaining / 1_000_000
+              ? "Repay amount exceeds the remaining balance."
+              : pending
+                ? pending
+                : null;
   const repayButtonLabel =
     pending === "Repaying installment"
       ? "Repaying"
@@ -769,6 +811,55 @@ function LoanCard({
           <Metric label="Repaid" value={`${formatUsdc(loan.repaidAmount).toFixed(2)} USDC`} />
           <Metric label="Remaining" value={`${(remaining / 1_000_000).toFixed(2)} USDC`} />
         </div>
+
+        {(status === "Repaying" || status === "Active") && (
+          <div className="space-y-2">
+            <p className="font-mono text-[9px] uppercase tracking-widest text-slate-500">Repayment Schedule</p>
+            <div className="rounded-md border border-slate-200 overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium">#</th>
+                    <th className="px-3 py-2 text-left font-medium">Due Date</th>
+                    <th className="px-3 py-2 text-right font-medium">Amount</th>
+                    <th className="px-3 py-2 text-right font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {computeRepaymentSchedule(loan).map((inst) => (
+                    <tr key={inst.month} className={inst.status === "current" ? "bg-blue-50" : inst.status === "overdue" ? "bg-red-50" : ""}>
+                      <td className="px-3 py-2 text-slate-600">{inst.month}</td>
+                      <td className="px-3 py-2 text-slate-600">{inst.dueDate.toLocaleDateString()}</td>
+                      <td className="px-3 py-2 text-right font-mono">{(inst.amount / 1_000_000).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right">
+                        <span className={
+                          inst.status === "paid" ? "text-emerald-600 font-medium" :
+                          inst.status === "current" ? "text-blue-600 font-medium" :
+                          inst.status === "overdue" ? "text-red-600 font-medium" :
+                          "text-slate-400"
+                        }>
+                          {inst.status === "paid" ? "✓ Paid" : inst.status === "current" ? "● Due" : inst.status === "overdue" ? "⚠ Overdue" : "Upcoming"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {isActive && (
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-4 space-y-3">
+            <p className="text-sm text-blue-800">
+              Your loan is fully funded! Disburse <strong>{formatUsdc(loan.amount).toFixed(2)} USDC</strong> to your wallet to start using the funds.
+            </p>
+            <Button className="w-full" disabled={Boolean(pending)} onClick={onDisburse}>
+              {pending === "Disbursing loan" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Disburse to Wallet
+            </Button>
+          </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <Field label="Repay amount">
@@ -847,37 +938,13 @@ function MagicBlockCard({
           <CardTitle className="text-emerald-400">MagicBlock Ephemeral Rollup</CardTitle>
         </div>
         <CardDescription>
-          Delegate your reputation profile to MagicBlock for real-time, low-cost updates. Loan operations remain on Solana base layer.
+          Real-time reputation updates via MagicBlock's Ephemeral Rollup. Your profile can be delegated to a fast execution layer for instant, low-cost score updates — while loan operations remain on Solana base layer.
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-wrap gap-3">
-        <Button
-          variant="outline"
-          className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
-          disabled={Boolean(pending)}
-          onClick={onDelegate}
-        >
-          {pending === "Delegating profile to MagicBlock ER" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Delegate to ER
-        </Button>
-        <Button
-          variant="outline"
-          className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
-          disabled={Boolean(pending)}
-          onClick={onCommit}
-        >
-          {pending === "Committing profile to base layer" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Commit to Base
-        </Button>
-        <Button
-          variant="outline"
-          className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
-          disabled={Boolean(pending)}
-          onClick={onUndelegate}
-        >
-          {pending === "Undelegating profile from ER" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Undelegate
-        </Button>
+      <CardContent>
+        <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-700">
+          MagicBlock delegation will be enabled once the ER validator is active for this program on devnet. Loan and repayment flows work independently on Solana L1.
+        </div>
       </CardContent>
     </Card>
   );

@@ -110,6 +110,41 @@ export type Campusfi = {
       "args": []
     },
     {
+      "name": "commitStudentProfile",
+      "docs": [
+        "Commit student profile state from ER back to base layer"
+      ],
+      "discriminator": [
+        49,
+        252,
+        59,
+        68,
+        124,
+        1,
+        140,
+        27
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "studentProfile",
+          "writable": true
+        },
+        {
+          "name": "magicContext",
+          "writable": true
+        },
+        {
+          "name": "magicProgram"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "createLoanRequest",
       "docs": [
         "Create a loan request"
@@ -206,6 +241,234 @@ export type Campusfi = {
           "type": "u16"
         }
       ]
+    },
+    {
+      "name": "delegateStudentProfile",
+      "docs": [
+        "Delegate student profile to Ephemeral Rollup for real-time reputation updates"
+      ],
+      "discriminator": [
+        47,
+        22,
+        48,
+        227,
+        120,
+        45,
+        180,
+        241
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "bufferStudentProfile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "studentProfile"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                232,
+                38,
+                68,
+                123,
+                3,
+                36,
+                219,
+                94,
+                154,
+                236,
+                243,
+                215,
+                130,
+                11,
+                57,
+                126,
+                77,
+                97,
+                200,
+                171,
+                48,
+                18,
+                60,
+                247,
+                108,
+                47,
+                208,
+                139,
+                120,
+                92,
+                175,
+                105
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegationRecordStudentProfile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "studentProfile"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegationProgram"
+            }
+          }
+        },
+        {
+          "name": "delegationMetadataStudentProfile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "studentProfile"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegationProgram"
+            }
+          }
+        },
+        {
+          "name": "studentProfile",
+          "writable": true
+        },
+        {
+          "name": "ownerProgram",
+          "address": "GdDRw2Z8wmnVndyNCDndk3AubLp8vrErAtqMFcBri8Nt"
+        },
+        {
+          "name": "delegationProgram",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "disburseLoan",
+      "docs": [
+        "Disburse funded loan to student wallet (transfers USDC from vault to student)"
+      ],
+      "discriminator": [
+        115,
+        159,
+        152,
+        253,
+        201,
+        29,
+        29,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "loanRequest",
+          "writable": true
+        },
+        {
+          "name": "vaultTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "studentTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "vaultAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "student",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
     },
     {
       "name": "fundLoan",
@@ -358,6 +621,43 @@ export type Campusfi = {
       ]
     },
     {
+      "name": "processUndelegation",
+      "discriminator": [
+        196,
+        28,
+        41,
+        206,
+        48,
+        37,
+        51,
+        167
+      ],
+      "accounts": [
+        {
+          "name": "baseAccount",
+          "writable": true
+        },
+        {
+          "name": "buffer"
+        },
+        {
+          "name": "payer",
+          "writable": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "accountSeeds",
+          "type": {
+            "vec": "bytes"
+          }
+        }
+      ]
+    },
+    {
       "name": "registerStudent",
       "docs": [
         "Register a new student profile"
@@ -481,6 +781,158 @@ export type Campusfi = {
       ]
     },
     {
+      "name": "undelegateStudentProfile",
+      "docs": [
+        "Undelegate student profile from ER"
+      ],
+      "discriminator": [
+        19,
+        152,
+        111,
+        116,
+        172,
+        157,
+        6,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "studentProfile",
+          "writable": true
+        },
+        {
+          "name": "magicContext",
+          "writable": true
+        },
+        {
+          "name": "magicProgram"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateCreditPassport",
+      "docs": [
+        "Update credit passport after loan completion or default"
+      ],
+      "discriminator": [
+        87,
+        255,
+        210,
+        229,
+        50,
+        106,
+        158,
+        170
+      ],
+      "accounts": [
+        {
+          "name": "creditPassport",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  115,
+                  115,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "student_profile.authority",
+                "account": "studentProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "studentProfile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  117,
+                  100,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "student_profile.authority",
+                "account": "studentProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "completed",
+          "type": "bool"
+        },
+        {
+          "name": "defaulted",
+          "type": "bool"
+        },
+        {
+          "name": "onTime",
+          "type": "bool"
+        },
+        {
+          "name": "borrowedAmount",
+          "type": "u64"
+        },
+        {
+          "name": "repaidAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "updateReputation",
       "docs": [
         "Update student reputation score (admin-only)"
@@ -553,6 +1005,19 @@ export type Campusfi = {
     }
   ],
   "accounts": [
+    {
+      "name": "creditPassport",
+      "discriminator": [
+        11,
+        205,
+        70,
+        128,
+        178,
+        191,
+        178,
+        197
+      ]
+    },
     {
       "name": "loanFunding",
       "discriminator": [
@@ -686,9 +1151,66 @@ export type Campusfi = {
       "code": 6015,
       "name": "invalidVault",
       "msg": "Invalid protocol vault token account"
+    },
+    {
+      "code": 6016,
+      "name": "loanNotDisbursable",
+      "msg": "Loan is not ready for disbursement"
     }
   ],
   "types": [
+    {
+      "name": "creditPassport",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "student",
+            "type": "pubkey"
+          },
+          {
+            "name": "totalLoans",
+            "type": "u16"
+          },
+          {
+            "name": "completedLoans",
+            "type": "u16"
+          },
+          {
+            "name": "defaultedLoans",
+            "type": "u16"
+          },
+          {
+            "name": "totalBorrowed",
+            "type": "u64"
+          },
+          {
+            "name": "totalRepaid",
+            "type": "u64"
+          },
+          {
+            "name": "onTimePayments",
+            "type": "u16"
+          },
+          {
+            "name": "latePayments",
+            "type": "u16"
+          },
+          {
+            "name": "creditScore",
+            "type": "u16"
+          },
+          {
+            "name": "lastUpdated",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
     {
       "name": "loanFunding",
       "type": {

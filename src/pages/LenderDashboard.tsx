@@ -1,5 +1,5 @@
 import { type ReactNode, useMemo, useState } from "react";
-import { Activity, AlertCircle, ArrowRight, Filter, Loader2, RefreshCw, ShieldCheck, Users, Wallet } from "lucide-react";
+import { Activity, AlertCircle, ArrowRight, Loader2, RefreshCw, ShieldCheck, Users, Wallet } from "lucide-react";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
@@ -28,6 +28,7 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
   const { connected, loading, actionPending, error, marketplaceLoans, lenderFundings, fundLoan, claimReturns, refresh, publicKey } = useCampusfi();
   const [fundAmounts, setFundAmounts] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [filters, setFilters] = useState({ riskTier: "all", minAmount: "", maxAmount: "", term: "all" });
 
   const portfolioRows = useMemo(() => {
     return lenderFundings.map((funding) => ({
@@ -36,8 +37,17 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
     }));
   }, [lenderFundings, marketplaceLoans]);
   const fundableMarketplaceLoans = useMemo(() => {
-    return marketplaceLoans.filter((loan) => loan.fundedAmount.toNumber() < loan.amount.toNumber());
-  }, [marketplaceLoans]);
+    return marketplaceLoans
+      .filter((loan) => loan.fundedAmount.toNumber() < loan.amount.toNumber())
+      .filter((loan) => {
+        if (filters.riskTier !== "all" && loan.riskTier !== Number(filters.riskTier)) return false;
+        const amount = loan.amount.toNumber() / 1_000_000;
+        if (filters.minAmount && amount < Number(filters.minAmount)) return false;
+        if (filters.maxAmount && amount > Number(filters.maxAmount)) return false;
+        if (filters.term !== "all" && loan.termMonths !== Number(filters.term)) return false;
+        return true;
+      });
+  }, [marketplaceLoans, filters]);
 
   async function runAction(action: () => Promise<unknown>) {
     setFormError(null);
@@ -88,13 +98,62 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
             <p className="text-slate-500">Fund verified students based on on-chain loan requests.</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" /> Filters
-            </Button>
             <Button variant="outline" onClick={refresh}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Refresh
             </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-4 rounded-md border border-slate-200 bg-white p-4">
+          <div className="space-y-1">
+            <Label className="text-xs text-slate-500">Risk Tier</Label>
+            <select
+              className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm"
+              value={filters.riskTier}
+              onChange={(e) => setFilters({ ...filters, riskTier: e.target.value })}
+            >
+              <option value="all">All tiers</option>
+              <option value="0">Low Risk</option>
+              <option value="1">Medium Risk</option>
+              <option value="2">High Risk</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-slate-500">Min Amount (USDC)</Label>
+            <Input
+              type="number"
+              placeholder="50"
+              value={filters.minAmount}
+              onChange={(e) => setFilters({ ...filters, minAmount: e.target.value })}
+              className="h-9"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-slate-500">Max Amount (USDC)</Label>
+            <Input
+              type="number"
+              placeholder="300"
+              value={filters.maxAmount}
+              onChange={(e) => setFilters({ ...filters, maxAmount: e.target.value })}
+              className="h-9"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-slate-500">Term</Label>
+            <select
+              className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm"
+              value={filters.term}
+              onChange={(e) => setFilters({ ...filters, term: e.target.value })}
+            >
+              <option value="all">Any term</option>
+              <option value="1">1 month</option>
+              <option value="2">2 months</option>
+              <option value="3">3 months</option>
+              <option value="4">4 months</option>
+              <option value="5">5 months</option>
+              <option value="6">6 months</option>
+            </select>
           </div>
         </div>
 

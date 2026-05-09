@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { Copy, ExternalLink, Loader2, Wallet } from "lucide-react";
-import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 
 function truncateAddress(address: string, chars = 4) {
@@ -24,7 +23,6 @@ export function WalletStatus() {
   const [copied, setCopied] = useState(false);
 
   const address = publicKey?.toBase58();
-  const network = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
 
   const shortAddress = useMemo(() => {
     return address ? truncateAddress(address) : null;
@@ -66,9 +64,6 @@ export function WalletStatus() {
   if (!connected) {
     return (
       <div className="flex items-center gap-3">
-        <Badge variant="warning" className="hidden sm:inline-flex">
-          {network}
-        </Badge>
         <WalletMultiButton className="campusfi-wallet-button">
           {connecting ? "Connecting..." : "Connect Wallet"}
         </WalletMultiButton>
@@ -78,9 +73,6 @@ export function WalletStatus() {
 
   return (
     <div className="flex items-center gap-3">
-      <Badge variant="warning" className="hidden sm:inline-flex">
-        {network}
-      </Badge>
 
       <div className="hidden lg:flex items-center gap-2 rounded-sm border border-slate-200 bg-white px-3 py-2">
         <span className="h-2 w-2 rounded-full bg-[#3B82F6]" aria-hidden />

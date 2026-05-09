@@ -12,13 +12,15 @@ import campusfiIdl from "./campusfi-idl.json";
 import type { Campusfi } from "./campusfi";
 
 export const USDC_DECIMALS = 1_000_000;
-export const CLAIMABLE_VAULT_CUTOFF_UNIX = 1778159227;
+export const CLAIMABLE_VAULT_CUTOFF_UNIX = 0;
 
 export const PROGRAM_ID = new PublicKey(
   import.meta.env.VITE_PROGRAM_ID || (campusfiIdl as Campusfi).address,
 );
 
-export const USDC_MINT = new PublicKey(import.meta.env.VITE_USDC_MINT || "");
+export const USDC_MINT = new PublicKey(
+  import.meta.env.VITE_USDC_MINT || "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr",
+);
 
 export type LoanStatus = "Pending" | "Active" | "Repaying" | "Completed" | "Defaulted";
 export type RiskTier = "Low Risk" | "Medium Risk" | "High Risk";
@@ -58,6 +60,20 @@ export type LoanFundingData = {
   bump: number;
 };
 
+export type CreditPassportData = {
+  publicKey: PublicKey;
+  student: PublicKey;
+  totalLoans: number;
+  completedLoans: number;
+  defaultedLoans: number;
+  totalBorrowed: anchor.BN;
+  totalRepaid: anchor.BN;
+  onTimePayments: number;
+  latePayments: number;
+  creditScore: number;
+  lastUpdated: anchor.BN;
+};
+
 export function createCampusfiProgram(
   connection: anchor.web3.Connection,
   wallet: anchor.Wallet,
@@ -93,6 +109,13 @@ export function loanFundingPda(loan: PublicKey, lender: PublicKey) {
 export function vaultAuthorityPda() {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("vault")],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function creditPassportPda(authority: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("passport"), authority.toBuffer()],
     PROGRAM_ID,
   )[0];
 }
@@ -196,3 +219,41 @@ export async function ensureAta(
 }
 
 export const systemProgram = SystemProgram.programId;
+
+export type ScheduleInstallment = {
+  month: number;
+  dueDate: Date;
+  amount: number;
+  status: "paid" | "current" | "upcoming" | "overdue";
+};
+
+export function computeRepaymentSchedule(loan: LoanRequestData): ScheduleInstallment[] {
+  const total = totalOwed(loan);
+  const months = loan.termMonths;
+  const baseInstallment = Math.floor(total / months);
+  const remainder = total - baseInstallment * months;
+  const startTimestamp = loan.createdAt.toNumber() * 1000;
+  const now = Date.now();
+  let cumulative = 0;
+  const repaid = loan.repaidAmount.toNumber();
+
+  const schedule: ScheduleInstallment[] = [];
+  for (let i = 0; i < months; i++) {
+    const amount = i === months - 1 ? baseInstallment + remainder : baseInstallment;
+    cumulative += amount;
+    const dueDate = new Date(startTimestamp);
+    dueDate.setMonth(dueDate.getMonth() + i + 1);
+
+    let status: ScheduleInstallment["status"];
+    if (repaid >= cumulative) {
+      status = "paid";
+    } else if (repaid >= cumulative - amount) {
+      status = dueDate.getTime() < now ? "overdue" : "current";
+    } else {
+      status = "upcoming";
+    }
+
+    schedule.push({ month: i + 1, dueDate, amount, status });
+  }
+  return schedule;
+}
