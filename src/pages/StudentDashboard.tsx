@@ -90,7 +90,8 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
         setVerificationEmail(restoredVerification.email);
         setProfileForm((current) => ({
           ...current,
-          university: current.university || restoredVerification.universityDomain.replace(".ac.id", "").toUpperCase(),
+          name: current.name || restoredVerification.studentName || "",
+          university: current.university || restoredVerification.university || restoredVerification.universityDomain.replace(".ac.id", "").toUpperCase(),
         }));
       })
       .catch((err) => {
@@ -130,7 +131,8 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
       setVerification(result);
       setProfileForm((current) => ({
         ...current,
-        university: current.university || result.universityDomain.replace(".ac.id", "").toUpperCase(),
+        name: current.name || result.studentName || "",
+        university: current.university || result.university || result.universityDomain.replace(".ac.id", "").toUpperCase(),
       }));
     } catch (err) {
       setVerificationError(err instanceof Error ? err.message : "Student verification failed.");
@@ -208,6 +210,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
               profileForm={profileForm}
               setProfileForm={setProfileForm}
               pending={actionPending}
+              verification={verification}
               onSubmit={() => runAction(() => registerStudent(profileForm.name, profileForm.university))}
             />
           </div>
@@ -303,6 +306,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
             profileForm={profileForm}
             setProfileForm={setProfileForm}
             pending={actionPending}
+            verification={verification}
             onSubmit={() => runAction(() => registerStudent(profileForm.name, profileForm.university))}
           />
         </div>
@@ -498,33 +502,42 @@ function RegisterStudentCard({
   setProfileForm,
   pending,
   onSubmit,
+  verification,
 }: {
   profileForm: { name: string; university: string };
   setProfileForm: (value: { name: string; university: string }) => void;
   pending: string | null;
   onSubmit: () => void;
+  verification: StudentVerification | null;
 }) {
+  const nameFromKtm = verification?.studentName && profileForm.name === verification?.studentName;
+  const uniFromKtm = verification?.university && profileForm.university === verification?.university;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Register Student Profile</CardTitle>
-        <CardDescription>Create your on-chain borrower identity first.</CardDescription>
+        <CardDescription>
+          {verification?.studentName
+            ? "Auto-filled from your verified KTM. Edit if needed."
+            : "Create your on-chain borrower identity first."}
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
-        <Field label="Name">
-          <Input
-            value={profileForm.name}
-            onChange={(event) => setProfileForm({ ...profileForm, name: event.target.value })}
-            className="h-10"
-          />
-        </Field>
-        <Field label="University">
-          <Input
-            value={profileForm.university}
-            onChange={(event) => setProfileForm({ ...profileForm, university: event.target.value })}
-            className="h-10"
-          />
-        </Field>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium text-[#111827]">Name</Label>
+            {nameFromKtm && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">from KTM</span>}
+          </div>
+          <Input value={profileForm.name} onChange={(event) => setProfileForm({ ...profileForm, name: event.target.value })} className="h-10" />
+        </div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium text-[#111827]">University</Label>
+            {uniFromKtm && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">from KTM</span>}
+          </div>
+          <Input value={profileForm.university} onChange={(event) => setProfileForm({ ...profileForm, university: event.target.value })} className="h-10" />
+        </div>
         <Button disabled={Boolean(pending)} onClick={onSubmit}>
           {pending === "Registering student profile" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Register
