@@ -55,7 +55,7 @@ export default async function handler(
 
   const { data, error } = await supabaseAdmin
     .from("student_verifications")
-    .select("id,wallet_address,student_email,university_domain,ktm_file_name,credential_hash,ocr_text_preview,confidence,status,verified_at,student_name,nim,major,university_name")
+    .select("id,wallet_address,student_email,university_domain,ktm_file_name,credential_hash,ocr_text_preview,confidence,status,verified_at")
     .eq("wallet_address", walletAddress)
     .eq("status", "verified")
     .order("created_at", { ascending: false })
@@ -68,6 +68,8 @@ export default async function handler(
 
   if (!data) return response.status(200).json({ status: "unverified" });
 
+  const extracted = data.ocr_text_preview ? extractKtmFields(data.ocr_text_preview) : {};
+
   return response.status(200).json({
     id: data.id,
     status: data.status,
@@ -79,9 +81,28 @@ export default async function handler(
     confidence: data.confidence === null ? undefined : Number(data.confidence),
     ocrTextPreview: data.ocr_text_preview ?? undefined,
     verifiedAt: data.verified_at ?? undefined,
-    studentName: data.student_name ?? undefined,
-    nim: data.nim ?? undefined,
-    university: data.university_name ?? undefined,
-    major: data.major ?? undefined,
+    ...extracted,
   });
+}
+
+function extractKtmFields(ocrText: string) {
+  const nimPattern = /(nim|npm|no\.?\s*induk|nomor induk|student\s*id)\s*:?\s*(\d{8,15})/i;
+  const standaloneNim = /\b(\d{9,12})\b/;
+  const nimMatch = nimPattern.exec(ocrText);
+  const looseNim = standaloneNim.exec(ocrText);
+  const nim = nimMatch?.[2] ?? looseNim?.[1] ?? null;
+
+  let university: string | null = null;
+  const uniMatch = ocrText.match(/(?:universitas|institut|politeknik|sekolah tinggi|akademi)\s+[A-Za-z\s.]+/i);
+  if (uniMatch) university = uniMatch[0].trim();
+
+  let studentName: string | null = null;
+  const nameMatch = ocrText.match(/(?:nama|name)\s*:?\s*([A-Za-z\s]{4,40})/i);
+  if (nameMatch) studentName = nameMatch[1].trim();
+
+  let major: string | null = null;
+  const majorMatch = ocrText.match(/(?:program studi|prodi|jurusan|major)\s*:?\s*([A-Za-z\s.,&-]{4,60})/i);
+  if (majorMatch) major = majorMatch[1].trim();
+
+  return { studentName, nim, university, major };
 }
