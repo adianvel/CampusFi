@@ -1,5 +1,5 @@
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, FileText, Loader2, RefreshCw, ShieldCheck, Upload, Zap } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileText, IdCard, Loader2, RefreshCw, ScanLine, ShieldCheck, Upload, Zap } from "lucide-react";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
@@ -411,31 +411,70 @@ function StudentVerificationCard({
           <div>
             <CardTitle>Verify Student Status</CardTitle>
             <CardDescription>
-              Confirm your campus email and KTM before creating an on-chain borrower profile.
+              Upload your KTM (Kartu Tanda Mahasiswa) and confirm your campus email.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent>
         <form className="space-y-4" onSubmit={onSubmit}>
-          <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
-            <Field label="Student email">
-              <Input
-                type="email"
-                autoComplete="email"
-                spellCheck={false}
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="h-10"
-                placeholder="name@university.ac.id"
-                aria-invalid={error ? "true" : undefined}
-              />
-            </Field>
-            <Field label="KTM document">
-              <label className="flex h-10 cursor-pointer items-center justify-between gap-3 rounded-sm border border-slate-300 bg-white px-3 text-sm text-slate-600 focus-within:ring-2 focus-within:ring-[#3B82F6] focus-within:ring-offset-2">
-                <span className="truncate">{ktmFile ? ktmFile.name : "Upload image or PDF"}</span>
-                <Upload className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+          <Field label="Student email">
+            <Input
+              type="email"
+              autoComplete="email"
+              spellCheck={false}
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="h-10"
+              placeholder="name@university.ac.id"
+              aria-invalid={error ? "true" : undefined}
+            />
+          </Field>
+
+          <div>
+            <Label className="mb-2 block text-sm font-medium text-[#111827]">KTM Document</Label>
+
+            {ktmFile ? (
+              <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded bg-blue-100">
+                  <IdCard className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-[#111827]">{ktmFile.name}</p>
+                  <p className="text-xs text-slate-500">{(ktmFile.size / 1024).toFixed(0)} KB</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setKtmFile(null)}
+                  className="text-xs text-slate-400 hover:text-slate-600"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed border-slate-300 p-6 transition-colors hover:border-blue-400 hover:bg-blue-50/50">
+                <div className="relative w-48 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="mb-2 flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <div className="h-3 w-3 rounded-sm bg-blue-500" />
+                    <span className="text-[9px] font-semibold uppercase text-slate-400">KTM</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="h-2 w-3/4 rounded bg-slate-100" />
+                    <div className="h-2 w-1/2 rounded bg-slate-100" />
+                    <div className="h-2 w-2/3 rounded bg-slate-100" />
+                    <div className="mt-2 h-2 w-1/3 rounded bg-blue-100" />
+                    <div className="h-2 w-1/4 rounded bg-blue-100" />
+                  </div>
+                  <div className="mt-2 h-2 w-1/2 rounded bg-slate-100" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium text-slate-600">
+                    <ScanLine className="mr-1 inline h-4 w-4" />
+                    Click to upload your KTM
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">JPG, PNG, or PDF up to 10MB</p>
+                </div>
                 <input
                   type="file"
                   accept="image/*,application/pdf"
@@ -443,14 +482,16 @@ function StudentVerificationCard({
                   onChange={(event) => setKtmFile(event.target.files?.[0] ?? null)}
                 />
               </label>
-            </Field>
-            <Button type="submit" disabled={pending} aria-busy={pending}>
-              {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-              Verify
-            </Button>
+            )}
           </div>
+
+          <Button type="submit" className="w-full" disabled={pending || !ktmFile} aria-busy={pending}>
+            {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
+            {pending ? "Verifying..." : "Verify KTM"}
+          </Button>
+
           <p className="text-xs text-slate-500">
-            PaddleOCR reads the KTM server-side; CampusFi stores only a verification result and credential hash.
+            Your KTM is processed by OCR to extract name, NIM, university, and major. Only verification status and a credential hash are stored.
           </p>
           {error && <InlineError message={error} />}
         </form>
