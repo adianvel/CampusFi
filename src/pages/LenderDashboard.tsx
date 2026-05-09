@@ -29,6 +29,7 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
   const [fundAmounts, setFundAmounts] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [fundingKey, setFundingKey] = useState<string | null>(null);
   const [filters, setFilters] = useState({ riskTier: "all", minAmount: "", maxAmount: "", term: "all" });
 
   const portfolioRows = useMemo(() => {
@@ -219,9 +220,11 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
                       ? "Enter amount"
                       : parsedFundAmount > remainingUsdc
                         ? "Exceeds remaining"
-                    : actionPending
-                      ? actionPending
-                      : null;
+                    : fundingKey === key
+                      ? "Funding..."
+                      : fundingKey
+                        ? "Another fund in progress"
+                        : null;
 
                 return (
                   <LoanMarketCard
@@ -230,11 +233,14 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
                     fundAmount={fundAmount}
                     setFundAmount={(value) => setFundAmounts({ ...fundAmounts, [key]: value })}
                     disabledReason={disabledReason}
-                    pending={actionPending === "Funding loan request"}
-                    onFund={() => runAction(async () => {
-                      await fundLoan(loan, parsedFundAmount);
-                      setFundAmounts({ ...fundAmounts, [key]: "" });
-                    }, `Successfully funded ${parsedFundAmount.toFixed(2)} USDC!`)}
+                    pending={fundingKey === key}
+                    onFund={() => {
+                      setFundingKey(key);
+                      runAction(async () => {
+                        await fundLoan(loan, parsedFundAmount);
+                        setFundAmounts({ ...fundAmounts, [key]: "" });
+                      }, `Successfully funded ${parsedFundAmount.toFixed(2)} USDC!`).finally(() => setFundingKey(null));
+                    }}
                   />
                 );
               })}
