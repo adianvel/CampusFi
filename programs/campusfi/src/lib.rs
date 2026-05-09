@@ -209,15 +209,15 @@ pub mod campusfi {
 
     /// Delegate student profile to Ephemeral Rollup for real-time reputation updates
     pub fn delegate_student_profile(ctx: Context<DelegateStudentProfile>) -> Result<()> {
-        // Check if already delegated
-        if ctx.accounts.student_profile.owner != &crate::id() {
-            return Err(CampusfiError::AlreadyDelegated.into());
-        }
+        msg!("[delegate] Starting delegation...");
         
         let payer_key = ctx.accounts.payer.key();
         let seeds: &[&[u8]] = &[b"student", payer_key.as_ref()];
+        let (pda, _) = Pubkey::find_program_address(seeds, &crate::id());
+        msg!("[delegate] PDA: {}", pda);
         
         let system_program_info = ctx.accounts.system_program.to_account_info();
+        
         let del_accounts = ephemeral_rollups_sdk::cpi::DelegateAccounts {
             payer: ctx.accounts.payer.as_ref(),
             pda: &ctx.accounts.student_profile,
@@ -229,6 +229,7 @@ pub mod campusfi {
             system_program: &system_program_info,
         };
         
+        msg!("[delegate] Calling delegate_account...");
         ephemeral_rollups_sdk::cpi::delegate_account(
             del_accounts,
             seeds,
@@ -238,6 +239,7 @@ pub mod campusfi {
             },
         )?;
         
+        msg!("[delegate] Delegation complete!");
         Ok(())
     }
 
@@ -469,7 +471,6 @@ pub struct DelegateStudentProfile<'info> {
     pub student_profile: AccountInfo<'info>,
 }
 
-#[commit]
 #[derive(Accounts)]
 pub struct CommitStudentProfile<'info> {
     #[account(mut)]
@@ -477,6 +478,11 @@ pub struct CommitStudentProfile<'info> {
     /// CHECK: May be owned by delegation program after delegation
     #[account(mut)]
     pub student_profile: UncheckedAccount<'info>,
+    /// CHECK: MagicBlock context - must be writable
+    #[account(mut)]
+    pub magic_context: UncheckedAccount<'info>,
+    /// CHECK: MagicBlock program - read-only
+    pub magic_program: UncheckedAccount<'info>,
 }
 
 /* ─── Data Accounts ─── */
@@ -573,6 +579,4 @@ pub enum CampusfiError {
     NothingToClaim,
     #[msg("Invalid protocol vault token account")]
     InvalidVault,
-    #[msg("Profile is already delegated — undelegate first")]
-    AlreadyDelegated,
 }
