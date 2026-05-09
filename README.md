@@ -291,8 +291,8 @@ If `.env.example` does not exist yet, create `.env` manually and keep it out of 
 Required environment variables:
 
 ```
-VITE_HELIUS_RPC_URL=     # Helius devnet RPC URL
-VITE_RPCFAST_RPC_URL=    # (optional) RpcFast alternative RPC
+VITE_RPCFAST_RPC_URL=    # Primary RPC (RpcFast)
+VITE_HELIUS_RPC_URL=     # Fallback RPC (Helius)
 VITE_SOLANA_NETWORK=devnet
 VITE_PROGRAM_ID=         # Deployed program ID
 VITE_USDC_MINT=          # USDC devnet mint address
@@ -386,8 +386,8 @@ To simulate the full flow (create loan → fund → repay), you need **USDC devn
 |---------|---------|------|
 | **PaddleOCR** | KTM / student card OCR verification | [aistudio.baidu.com/paddleocr](https://aistudio.baidu.com/paddleocr) |
 | **MagicBlock** | Ephemeral Rollup for real-time reputation updates | [magicblock.xyz](https://www.magicblock.xyz/) |
-| **Helius RPC** | Primary Solana RPC endpoint | `VITE_HELIUS_RPC_URL` in `.env` |
-| **RpcFast** | Alternative Solana RPC (faster devnet) | `VITE_RPCFAST_RPC_URL` in `.env` |
+| **RpcFast** | Primary Solana RPC | [rpcfast.com](https://rpcfast.com/) — `VITE_RPCFAST_RPC_URL` in `.env` |
+| **Helius RPC** | Fallback Solana RPC | `VITE_HELIUS_RPC_URL` in `.env` |
 | **Supabase** | Off-chain storage (verification, profiles) | `SUPABASE_URL` in `.env` |
 
 ## Success Metrics
