@@ -36,8 +36,8 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
     undelegateStudentProfile,
   } = useCampusfi();
   const [profileForm, setProfileForm] = useState({
-    name: "Rizki Ananda",
-    university: "Universitas Indonesia",
+    name: "",
+    university: "",
   });
   const [loanForm, setLoanForm] = useState({
     amount: 150,
@@ -89,9 +89,8 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
         setVerificationError(null);
         setVerificationEmail(restoredVerification.email);
         setProfileForm((current) => ({
-          ...current,
-          name: current.name || restoredVerification.studentName || "",
-          university: current.university || restoredVerification.university || restoredVerification.universityDomain.replace(".ac.id", "").toUpperCase(),
+          name: restoredVerification.studentName || current.name,
+          university: restoredVerification.university || restoredVerification.universityDomain.replace(".ac.id", "").toUpperCase() || current.university,
         }));
       })
       .catch((err) => {
@@ -130,9 +129,8 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
       saveStudentVerification(result, publicKey?.toBase58());
       setVerification(result);
       setProfileForm((current) => ({
-        ...current,
-        name: current.name || result.studentName || "",
-        university: current.university || result.university || result.universityDomain.replace(".ac.id", "").toUpperCase(),
+        name: result.studentName || current.name,
+        university: result.university || result.universityDomain.replace(".ac.id", "").toUpperCase() || current.university,
       }));
     } catch (err) {
       setVerificationError(err instanceof Error ? err.message : "Student verification failed.");
