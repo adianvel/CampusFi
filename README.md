@@ -288,6 +288,22 @@ cp .env.example .env
 
 If `.env.example` does not exist yet, create `.env` manually and keep it out of Git.
 
+Required environment variables:
+
+```
+VITE_HELIUS_RPC_URL=     # Helius devnet RPC URL
+VITE_RPCFAST_RPC_URL=    # (optional) RpcFast alternative RPC
+VITE_SOLANA_NETWORK=devnet
+VITE_PROGRAM_ID=         # Deployed program ID
+VITE_USDC_MINT=          # USDC devnet mint address
+VITE_GEMINI_API_KEY=     # (optional) Gemini for KTM extraction
+PADDLEOCR_API_URL=       # PaddleOCR API endpoint
+PADDLEOCR_TOKEN=         # PaddleOCR auth token
+SUPABASE_URL=            # Supabase project URL
+SUPABASE_ANON_KEY=       # Supabase anon key
+SUPABASE_SERVICE_ROLE_KEY= # Supabase service role key
+```
+
 ## Development
 
 Start the frontend:
@@ -341,6 +357,38 @@ npm run anchor:test:wsl
 ```
 
 Program IDs are configured in `Anchor.toml`.
+
+## Development Notes
+
+### Simulating Loans
+
+To simulate the full flow (create loan → fund → repay), you need **USDC devnet SPL tokens** in both a student wallet and a lender wallet (separate wallets).
+
+**USDC Devnet Mint Address:** `Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr`
+
+**Faucets:**
+
+| Resource | Link |
+|----------|------|
+| SPL Token Faucet (USDC-Dev) | [spl-token-faucet.com](https://spl-token-faucet.com/?token-name=USDC-Dev) |
+| Solana Devnet Airdrop | `solana airdrop 2 <wallet>` (up to 2 SOL per request) |
+
+**Workflow:**
+1. Airdrop SOL to both student and lender wallets
+2. Use the faucet to mint USDC-Dev to both wallets
+3. Student wallet: register, create loan request
+4. Lender wallet: fund the loan with USDC
+5. Student wallet: repay installments
+
+### External Services
+
+| Service | Purpose | Link |
+|---------|---------|------|
+| **PaddleOCR** | KTM / student card OCR verification | [aistudio.baidu.com/paddleocr](https://aistudio.baidu.com/paddleocr) |
+| **MagicBlock** | Ephemeral Rollup for real-time reputation updates | [magicblock.xyz](https://www.magicblock.xyz/) |
+| **Helius RPC** | Primary Solana RPC endpoint | `VITE_HELIUS_RPC_URL` in `.env` |
+| **RpcFast** | Alternative Solana RPC (faster devnet) | `VITE_RPCFAST_RPC_URL` in `.env` |
+| **Supabase** | Off-chain storage (verification, profiles) | `SUPABASE_URL` in `.env` |
 
 ## Success Metrics
 
