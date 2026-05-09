@@ -12,6 +12,7 @@ import {
   parseUsdc,
   studentProfilePda,
   systemProgram,
+  totalOwed,
   vaultAuthorityPda,
   type LoanFundingData,
   type LoanRequestData,
@@ -290,6 +291,20 @@ export function useCampusfi() {
           } as never)
           .preInstructions(createVaultTokenAccountInstruction ? [createVaultTokenAccountInstruction] : [])
           .rpc();
+
+        const newRepaid = new anchor.BN(loan.repaidAmount.toNumber() + requestedAmount.toNumber());
+        const newStatus = newRepaid.toNumber() >= totalOwed(loan) ? 3 : 2;
+
+        const updateLoan = (prev: LoanRequestData[]) =>
+          prev.map((l) =>
+            l.publicKey.equals(loan.publicKey)
+              ? { ...l, repaidAmount: newRepaid, status: newStatus }
+              : l,
+          );
+
+        setStudentLoans(updateLoan);
+        setMarketplaceLoans(updateLoan);
+
         await refresh();
       } catch (err) {
         setError(normalizeError(err));
