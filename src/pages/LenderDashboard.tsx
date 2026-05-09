@@ -39,7 +39,7 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
     return marketplaceLoans.filter((loan) => loan.fundedAmount.toNumber() < loan.amount.toNumber());
   }, [marketplaceLoans]);
 
-  async function runAction(action: () => Promise<void>) {
+  async function runAction(action: () => Promise<unknown>) {
     setFormError(null);
     try {
       await action();
@@ -126,6 +126,12 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
                 </AlertDescription>
               </Alert>
             )}
+            {(error || formError) && (
+              <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-700">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-red-700">{error || formError}</AlertDescription>
+              </Alert>
+            )}
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {fundableMarketplaceLoans.map((loan) => {
                 const key = loan.publicKey.toBase58();
@@ -162,11 +168,9 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
           </>
         )}
 
-        {(error || formError) && <InlineError message={error || formError || ""} />}
-      </div>
-    );
-  }
-
+        </div>
+      );
+    }
   const activePrincipal = lenderFundings.reduce((sum, funding) => sum + funding.amount.toNumber(), 0);
   const expectedMonthly = portfolioRows.reduce(
     (sum, row) => sum + (row.loan ? (row.funding.amount.toNumber() * row.loan.interestRateBps) / 10_000 : 0),

@@ -195,12 +195,14 @@ export function useCampusfi() {
   const fundLoan = useCallback(
     async (loan: LoanRequestData, amount: number) => {
       if (!program || !wallet.publicKey) throw new Error("Connect wallet first");
-      if (!wallet.sendTransaction) throw new Error("Wallet cannot send transactions");
+      if (!wallet.sendTransaction) throw new Error("Wallet cannot send transactions — use Phantom, Backpack, or Solflare");
       setActionPending("Funding loan request");
       setError(null);
       try {
         const lenderTokenAccount = await getAssociatedTokenAddress(USDC_MINT, wallet.publicKey);
-        const lenderTokenBalance = await getAccount(connection, lenderTokenAccount);
+        const lenderTokenBalance = await getAccount(connection, lenderTokenAccount).catch(() => {
+          throw new Error(`No USDC token account found. Visit https://spl-token-faucet.com/?token-name=USDC-Dev to mint test USDC.`);
+        });
         const requestedAmount = parseUsdc(amount);
         if (lenderTokenBalance.amount < BigInt(requestedAmount.toString())) {
           throw new Error(
@@ -215,7 +217,7 @@ export function useCampusfi() {
           true,
         );
 
-        await program.methods
+        const sig = await program.methods
           .fundLoan(requestedAmount)
           .accounts({
             loanFunding: loanFundingPda(loan.publicKey, wallet.publicKey),
@@ -230,6 +232,7 @@ export function useCampusfi() {
           .preInstructions(createVaultTokenAccountInstruction ? [createVaultTokenAccountInstruction] : [])
           .rpc();
         await refresh();
+        return sig;
       } catch (err) {
         setError(normalizeError(err));
         throw err;
