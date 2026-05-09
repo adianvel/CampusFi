@@ -73,15 +73,20 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
       return;
     }
 
+    setVerificationLoading(false);
+
     let isMounted = true;
 
     getStudentVerification(walletAddress)
       .then((restoredVerification) => {
-        if (!isMounted || !restoredVerification) return;
+        if (!isMounted) return;
+        if (!restoredVerification || restoredVerification.status !== "verified") {
+          setVerification(null);
+          return;
+        }
         saveStudentVerification(restoredVerification, walletAddress);
         setVerification(restoredVerification);
         setVerificationError(null);
-        setVerificationLoading(false);
         setVerificationEmail(restoredVerification.email);
         setProfileForm((current) => ({
           ...current,
