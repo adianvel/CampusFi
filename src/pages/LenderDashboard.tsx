@@ -28,6 +28,7 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
   const { connected, loading, actionPending, error, marketplaceLoans, lenderFundings, fundLoan, claimReturns, refresh, publicKey } = useCampusfi();
   const [fundAmounts, setFundAmounts] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [filters, setFilters] = useState({ riskTier: "all", minAmount: "", maxAmount: "", term: "all" });
 
   const portfolioRows = useMemo(() => {
@@ -49,10 +50,15 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
       });
   }, [marketplaceLoans, filters]);
 
-  async function runAction(action: () => Promise<unknown>) {
+  async function runAction(action: () => Promise<unknown>, successMessage?: string) {
     setFormError(null);
+    setSuccessMsg(null);
     try {
       await action();
+      if (successMessage) {
+        setSuccessMsg(successMessage);
+        setTimeout(() => setSuccessMsg(null), 5000);
+      }
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Transaction failed");
     }
@@ -191,6 +197,12 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
                 <AlertDescription className="text-red-700">{error || formError}</AlertDescription>
               </Alert>
             )}
+            {successMsg && (
+              <Alert className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                <ShieldCheck className="h-4 w-4" />
+                <AlertDescription className="text-emerald-700">{successMsg}</AlertDescription>
+              </Alert>
+            )}
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {fundableMarketplaceLoans.map((loan) => {
                 const key = loan.publicKey.toBase58();
@@ -219,7 +231,10 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
                     setFundAmount={(value) => setFundAmounts({ ...fundAmounts, [key]: value })}
                     disabledReason={disabledReason}
                     pending={actionPending === "Funding loan request"}
-                    onFund={() => runAction(() => fundLoan(loan, parsedFundAmount))}
+                    onFund={() => runAction(async () => {
+                      await fundLoan(loan, parsedFundAmount);
+                      setFundAmounts({ ...fundAmounts, [key]: "" });
+                    }, `Successfully funded ${parsedFundAmount.toFixed(2)} USDC!`)}
                   />
                 );
               })}
@@ -299,7 +314,7 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
                     funding={funding}
                     loan={loan}
                     pending={actionPending === "Claiming lender returns"}
-                    onClaim={() => loan && runAction(() => claimReturns(loan, funding))}
+                    onClaim={() => loan && runAction(() => claimReturns(loan, funding), "Returns claimed successfully!")}
                   />
                 ))
               )}
