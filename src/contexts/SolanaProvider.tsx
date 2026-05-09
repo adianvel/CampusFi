@@ -9,13 +9,21 @@ type SolanaProviderProps = {
 
 export function SolanaProvider({ children }: SolanaProviderProps) {
   const endpoint = useMemo(() => {
-    return import.meta.env.VITE_HELIUS_RPC_URL || clusterApiUrl("devnet");
+    const rpcFast = import.meta.env.VITE_RPCFAST_RPC_URL;
+    const helius = import.meta.env.VITE_HELIUS_RPC_URL;
+    return rpcFast || helius || clusterApiUrl("devnet");
+  }, []);
+
+  const wsEndpoint = useMemo(() => {
+    const rpcFast = import.meta.env.VITE_RPCFAST_RPC_URL;
+    if (rpcFast) return rpcFast.replace("https://", "wss://");
+    return undefined;
   }, []);
 
   const wallets = useMemo(() => [], []);
 
   return (
-    <ConnectionProvider endpoint={endpoint}>
+    <ConnectionProvider endpoint={endpoint} config={{ wsEndpoint }}>
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>
