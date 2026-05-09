@@ -50,6 +50,16 @@ type StudentVerificationInsert = {
   ktm_file_path: string; ktm_file_name: string; credential_hash: string;
   ocr_text_preview: string; confidence: number;
   status: "verified" | "pending" | "rejected" | "failed"; verified_at: string | null;
+  student_name?: string; nim?: string; major?: string; university_name?: string;
+};
+
+type ExtractedFields = {
+  isValidKtm: boolean;
+  studentName: string | null;
+  nim: string | null;
+  university: string | null;
+  major: string | null;
+  reason: string;
 };
 
 const studentKtmBucket = "student-ktm";
@@ -129,6 +139,16 @@ export default async function handler(
       return response.status(422).json({ error: "OCR could not read enough KTM text. Upload a clearer image." });
     }
 
+    const extracted = await extractKtmFields(normalizedText);
+
+    if (!extracted.isValidKtm) {
+      return response.status(422).json({
+        error: `Invalid student card: ${extracted.reason}`,
+        code: "INVALID_KTM",
+        ocrPreview: normalizedText.slice(0, 200),
+      });
+    }
+
     const credentialHash = crypto.createHash("sha256").update(email).update(fileBuffer).digest("hex");
     const universityDomain = email.split("@")[1] ?? "";
     const confidence = estimateConfidence(normalizedText);
@@ -143,6 +163,10 @@ export default async function handler(
       wallet_address: walletAddress, student_email: email, university_domain: universityDomain,
       ktm_file_path: filePath, ktm_file_name: payload.fileName, credential_hash: credentialHash,
       ocr_text_preview: normalizedText.slice(0, 240), confidence, status: "verified", verified_at: verifiedAt,
+      student_name: extracted.studentName ?? undefined,
+      nim: extracted.nim ?? undefined,
+      major: extracted.major ?? undefined,
+      university_name: extracted.university ?? undefined,
     };
 
     const insertResult = await supabaseAdmin.from("student_verifications").insert(verification).select("id").single();
@@ -155,6 +179,10 @@ export default async function handler(
       id: insertResult.data.id, status: "verified", walletAddress, email, universityDomain,
       ktmFileName: payload.fileName, credentialHash, confidence,
       ocrTextPreview: normalizedText.slice(0, 240), verifiedAt,
+      studentName: extracted.studentName,
+      nim: extracted.nim,
+      university: extracted.university,
+      major: extracted.major,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "PaddleOCR verification failed.";
@@ -177,6 +205,96 @@ function createStoragePath(walletAddress: string, fileName: string) {
   const extension = path.extname(fileName).toLowerCase() || ".upload";
   const safeWallet = walletAddress.replace(/[^a-zA-Z0-9]/g, "");
   return `${safeWallet}/${Date.now()}-${crypto.randomUUID()}${extension}`;
+}
+
+async function extractKtmFields(ocrText: string): Promise<ExtractedFields> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    const manual = extractKtmFieldsManual(ocrText);
+    return manual;
+  }
+
+  try {
+    const prompt = `Analyze this OCR text from an Indonesian university student ID card (KTM - Kartu Tanda Mahasiswa).
+
+Return ONLY a JSON object with these fields:
+{
+  "isValidKtm": true/false,
+  "studentName": "extracted name or null",
+  "nim": "student ID number (NIM/NPM) or null",
+  "university": "university name or null",
+  "major": "major/prodi or null",
+  "reason": "brief explanation"
+}
+
+isValidKtm = true if the text clearly shows a student card (has NIM, university name, "mahasiswa", "KTM", etc.).
+isValidKtm = false if it's NOT a student card (receipt, random document, selfie, etc.).
+
+OCR text:
+${ocrText}`;
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0, maxOutputTokens: 500 },
+      }),
+    });
+
+    if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
+
+    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON in Gemini response");
+
+    const parsed = JSON.parse(jsonMatch[0]) as ExtractedFields;
+    return parsed;
+  } catch {
+    return extractKtmFieldsManual(ocrText);
+  }
+}
+
+function extractKtmFieldsManual(ocrText: string): ExtractedFields {
+  const text = ocrText.toLowerCase();
+  const lines = ocrText.split(/\n/).map((l) => l.trim()).filter(Boolean);
+
+  const ktmIndicators = /(kartu tanda mahasiswa|ktm|kartu mahasiswa|student identity card|tanda mahasiswa)/i;
+  const studentIndicators = /(mahasiswa|student|universitas|university|institut|politeknik|sekolah tinggi|fakultas|jurusan|program studi|prodi)/i;
+  const nimPattern = /(nim|npm|no\.?\s*induk|nomor induk|student\s*id)\s*:?\s*(\d{8,15})/i;
+  const standaloneNim = /\b(\d{9,12})\b/;
+
+  const hasKtmWord = ktmIndicators.test(text);
+  const hasStudentWords = studentIndicators.test(text);
+  const namMatch = nimPattern.exec(ocrText);
+  const looseNim = standaloneNim.exec(ocrText);
+
+  const nim = namMatch?.[2] ?? looseNim?.[1] ?? null;
+  const hasNim = nim !== null;
+
+  const isValidKtm = (hasKtmWord || hasStudentWords) && hasNim;
+
+  let university: string | null = null;
+  const uniMatch = ocrText.match(/(?:universitas|institut|politeknik|sekolah tinggi|akademi)\s+[A-Za-z\s.]+/i);
+  if (uniMatch) university = uniMatch[0].trim();
+
+  let studentName: string | null = null;
+  const nameMatch = ocrText.match(/(?:nama|name)\s*:?\s*([A-Za-z\s]{4,40})/i);
+  if (nameMatch) studentName = nameMatch[1].trim();
+
+  let major: string | null = null;
+  const majorMatch = ocrText.match(/(?:program studi|prodi|jurusan|major)\s*:?\s*([A-Za-z\s.,&-]{4,60})/i);
+  if (majorMatch) major = majorMatch[1].trim();
+
+  let reason = "";
+  if (!isValidKtm) {
+    if (!hasStudentWords && !hasKtmWord) reason = "Tidak ditemukan kata kunci KTM/kartu mahasiswa. Pastikan upload foto KTM yang jelas.";
+    else if (!hasNim) reason = "NIM (Nomor Induk Mahasiswa) tidak terdeteksi. Pastikan NIM terbaca jelas di foto.";
+    else reason = "Dokumen tidak dikenali sebagai KTM yang valid.";
+  }
+
+  return { isValidKtm, studentName, nim, university, major, reason };
 }
 
 function estimateConfidence(text: string) {

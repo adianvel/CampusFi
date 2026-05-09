@@ -11,6 +11,10 @@ export type StudentVerification = {
   confidence?: number;
   ocrTextPreview?: string;
   verifiedAt?: string;
+  studentName?: string;
+  nim?: string;
+  university?: string;
+  major?: string;
 };
 
 const legacyVerificationKey = "campusfi.studentVerification";

@@ -451,19 +451,38 @@ function StudentVerificationCard({
 }
 
 function VerificationSummary({ verification }: { verification: StudentVerification }) {
+  const details = [
+    verification.studentName && { label: "Name", value: verification.studentName },
+    verification.nim && { label: "NIM", value: verification.nim },
+    verification.university && { label: "University", value: verification.university },
+    verification.major && { label: "Major", value: verification.major },
+  ].filter(Boolean) as { label: string; value: string }[];
+
   return (
     <Card className="border-[#3B82F6]/20 bg-blue-50">
-      <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <CheckCircle2 className="h-5 w-5 text-[#2563EB]" aria-hidden />
-          <div>
-            <p className="text-sm font-semibold text-[#111827]">Student verification complete</p>
-            <p className="text-xs text-slate-500">
-              {verification.email} / {verification.ktmFileName}
-            </p>
+      <CardContent className="flex flex-col gap-3 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-[#2563EB]" aria-hidden />
+            <div>
+              <p className="text-sm font-semibold text-[#111827]">Student verification complete</p>
+              <p className="text-xs text-slate-500">
+                {verification.email} / {verification.ktmFileName}
+              </p>
+            </div>
           </div>
+          <Badge variant="success">Verified</Badge>
         </div>
-        <Badge variant="success">Verified</Badge>
+        {details.length > 0 && (
+          <div className="grid grid-cols-2 gap-2 border-t border-blue-200 pt-3">
+            {details.map((d) => (
+              <div key={d.label} className="rounded border border-blue-100 bg-white px-3 py-1.5">
+                <span className="text-[10px] uppercase text-slate-400">{d.label}</span>
+                <p className="text-sm font-medium text-[#111827]">{d.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

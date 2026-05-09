@@ -55,7 +55,7 @@ export default async function handler(
 
   const { data, error } = await supabaseAdmin
     .from("student_verifications")
-    .select("id,wallet_address,student_email,university_domain,ktm_file_name,credential_hash,ocr_text_preview,confidence,status,verified_at")
+    .select("id,wallet_address,student_email,university_domain,ktm_file_name,credential_hash,ocr_text_preview,confidence,status,verified_at,student_name,nim,major,university_name")
     .eq("wallet_address", walletAddress)
     .eq("status", "verified")
     .order("created_at", { ascending: false })
@@ -79,5 +79,9 @@ export default async function handler(
     confidence: data.confidence === null ? undefined : Number(data.confidence),
     ocrTextPreview: data.ocr_text_preview ?? undefined,
     verifiedAt: data.verified_at ?? undefined,
+    studentName: data.student_name ?? undefined,
+    nim: data.nim ?? undefined,
+    university: data.university_name ?? undefined,
+    major: data.major ?? undefined,
   });
 }
