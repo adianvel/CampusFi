@@ -43,7 +43,6 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
     amount: 150,
     purpose: "Laptop Upgrade Fund",
     termMonths: 3,
-    interestRateBps: 120,
   });
   const [repayAmount, setRepayAmount] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
@@ -56,6 +55,12 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
 
   const activeLoan = useMemo(() => studentLoans[0] ?? null, [studentLoans]);
   const reputationScore = studentProfile ? Math.round(studentProfile.reputationScore / 10) : 0;
+
+  const autoInterestRateBps = useMemo(() => {
+    if (reputationScore >= 75) return 60;
+    if (reputationScore >= 50) return 120;
+    return 200;
+  }, [reputationScore]);
 
   useEffect(() => {
     const walletAddress = publicKey?.toBase58();
@@ -338,7 +343,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
                     className="h-10"
                   />
                 </Field>
-                <Field label="Term">
+                <Field label="Term (months)">
                   <Input
                     type="number"
                     min={1}
@@ -348,21 +353,23 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
                     className="h-10"
                   />
                 </Field>
-                <Field label="Monthly bps">
-                  <Input
-                    type="number"
-                    min={60}
-                    max={400}
-                    value={loanForm.interestRateBps}
-                    onChange={(event) => setLoanForm({ ...loanForm, interestRateBps: Number(event.target.value) })}
-                    className="h-10"
-                  />
-                </Field>
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium text-[#111827]">Interest Rate</Label>
+                  <div className="flex h-10 items-center rounded-sm border border-slate-200 bg-slate-50 px-3">
+                    <span className="font-mono text-sm text-[#111827]">{autoInterestRateBps} bps</span>
+                    <span className="ml-2 text-xs text-slate-500">
+                      ({(autoInterestRateBps / 100).toFixed(1)}%/month)
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Auto from your {reputationScore >= 75 ? "Low" : reputationScore >= 50 ? "Medium" : "High"} Risk tier
+                  </p>
+                </div>
               </div>
               <Button
                 className="w-full"
                 disabled={Boolean(actionPending)}
-                onClick={() => runAction(() => createLoanRequest(loanForm))}
+                onClick={() => runAction(() => createLoanRequest({ ...loanForm, interestRateBps: autoInterestRateBps }))}
               >
                 {actionPending === "Creating loan request" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create On-Chain Loan
