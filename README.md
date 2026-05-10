@@ -157,13 +157,21 @@ CampusFi creates a Student Reputation Profile shown to lenders.
 
 Inputs:
 
-- Student identity: KTM and `.ac.id` email
+- Student identity: KTM and `.ac.id` email (base verification)
+- **CV / Portfolio upload: certificates, GitHub, competitions, internships, research (additional score)**
 - Academic signal: GPA band, transcript, scholarship
 - Achievement: competition, hackathon, research award
 - Portfolio: GitHub, design, writing, startup, freelance work
 - Work signal: internship, freelance, assistant role
 - Social trust: organization role, lecturer endorsement
 - Repayment history: paid loans, late payments, defaults
+
+How scoring works:
+
+- **Base score** comes from KTM verification (identity confirmed)
+- **Additional score** comes from uploaded achievements — CV, certificates, competition results, GitHub portfolio, internship proof
+- **Stronger profiles get lower interest rates** and faster funding from lenders
+- **Repayment history** further improves the score over time via Credit Passport
 
 Score components should be visible instead of one black-box score:
 
