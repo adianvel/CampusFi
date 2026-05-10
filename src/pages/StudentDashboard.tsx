@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { AlertCircle, CheckCircle2, FileText, IdCard, Loader2, RefreshCw, ScanLine, ShieldCheck, Upload, Zap } from "lucide-react";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
@@ -136,11 +136,13 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
   }
 
   // Auto-register on-chain profile from KTM data when verified but no profile exists
+  const autoRegisterAttempted = useRef(false);
   useEffect(() => {
-    if (!verification || studentProfile || !connected || actionPending) return;
+    if (!verification || studentProfile || !connected || actionPending || autoRegisterAttempted.current) return;
     const name = verification.studentName || verification.email?.split("@")[0] || "Student";
     const university = verification.university || verification.universityDomain?.replace(".ac.id", "").toUpperCase() || "University";
     if (name.length > 2 && university.length > 2) {
+      autoRegisterAttempted.current = true;
       registerStudent(name.slice(0, 64), university.slice(0, 64))
         .then(() => refresh())
         .catch(() => refresh());
