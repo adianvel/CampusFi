@@ -206,6 +206,7 @@ export function useCampusfi() {
             systemProgram,
           } as never)
           .rpc();
+        await new Promise((r) => setTimeout(r, 1000));
         await refresh();
       } catch (err) {
         setError(normalizeError(err));
