@@ -61,8 +61,6 @@ type ExtractedFields = {
   reason: string;
 };
 
-const studentKtmBucket = "student-ktm";
-
 export default async function handler(
   request: { body?: unknown; method?: string },
   response: {
@@ -101,18 +99,7 @@ export default async function handler(
   }
 
   try {
-    await ensureBucket(supabaseAdmin);
-
     const fileBuffer = Buffer.from(payload.fileBase64, "base64");
-    const filePath = createStoragePath(walletAddress, payload.fileName);
-    const uploadResult = await supabaseAdmin.storage.from(studentKtmBucket).upload(filePath, fileBuffer, {
-      contentType: payload.mimeType || (payload.fileType === 0 ? "application/pdf" : "image/jpeg"),
-      upsert: false,
-    });
-
-    if (uploadResult.error) {
-      return response.status(500).json({ error: uploadResult.error.message, code: "SUPABASE_STORAGE_UPLOAD_FAILED" });
-    }
 
     const paddleResponse = await fetch(ocrApiUrl, {
       method: "POST",
@@ -160,7 +147,7 @@ export default async function handler(
 
     const verification: StudentVerificationInsert = {
       wallet_address: walletAddress, student_email: email, university_domain: universityDomain,
-      ktm_file_path: filePath, ktm_file_name: payload.fileName, credential_hash: credentialHash,
+      ktm_file_path: "", ktm_file_name: payload.fileName, credential_hash: credentialHash,
       ocr_text_preview: normalizedText.slice(0, 240), confidence, status: "verified", verified_at: verifiedAt,
     };
 
@@ -183,23 +170,6 @@ export default async function handler(
     const message = err instanceof Error ? err.message : "PaddleOCR verification failed.";
     return response.status(500).json({ error: message });
   }
-}
-
-async function ensureBucket(supabaseAdmin: SupabaseClient) {
-  const { data } = await supabaseAdmin.storage.getBucket(studentKtmBucket);
-  if (data) return;
-  const { error } = await supabaseAdmin.storage.createBucket(studentKtmBucket, {
-    public: false,
-    allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
-    fileSizeLimit: "10MB",
-  });
-  if (error && !/already exists/i.test(error.message)) throw error;
-}
-
-function createStoragePath(walletAddress: string, fileName: string) {
-  const extension = path.extname(fileName).toLowerCase() || ".upload";
-  const safeWallet = walletAddress.replace(/[^a-zA-Z0-9]/g, "");
-  return `${safeWallet}/${Date.now()}-${crypto.randomUUID()}${extension}`;
 }
 
 async function extractKtmFields(ocrText: string): Promise<ExtractedFields> {
