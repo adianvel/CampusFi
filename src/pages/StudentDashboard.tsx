@@ -145,7 +145,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
         .then(() => refresh())
         .catch(() => refresh());
     }
-  }, [verification, studentProfile, connected]);
+  }, [verification, studentProfile, connected, actionPending]);
 
   async function handleStudentVerification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
