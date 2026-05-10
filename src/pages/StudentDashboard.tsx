@@ -38,7 +38,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
     commitStudentProfile,
     undelegateStudentProfile,
   } = useCampusfi();
-  const { signMessage } = useWallet();
+  const { signMessage, connecting: walletConnecting } = useWallet();
   const [profileForm, setProfileForm] = useState({
     name: "",
     university: "",
@@ -173,6 +173,16 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
   }
 
   if (!connected) {
+    if (walletConnecting) {
+      return (
+        <Card className="mx-auto max-w-3xl">
+          <CardContent className="flex items-center gap-4 p-8">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">Connecting wallet...</span>
+          </CardContent>
+        </Card>
+      );
+    }
     return (
       <Card className="mx-auto max-w-3xl border-primary/20 bg-card shadow-sm">
         <CardContent className="grid gap-8 p-8 md:grid-cols-[1fr_220px] md:items-center">
