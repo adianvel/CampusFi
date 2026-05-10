@@ -125,7 +125,7 @@ export default async function handler(
       return response.status(422).json({ error: "OCR could not read enough KTM text. Upload a clearer image." });
     }
 
-    const extracted = await extractKtmFields(normalizedText);
+    const extracted = extractKtmFieldsManual(normalizedText);
 
     if (!extracted.isValidKtm) {
       return response.status(422).json({
@@ -169,55 +169,6 @@ export default async function handler(
   } catch (err) {
     const message = err instanceof Error ? err.message : "PaddleOCR verification failed.";
     return response.status(500).json({ error: message });
-  }
-}
-
-async function extractKtmFields(ocrText: string): Promise<ExtractedFields> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    const manual = extractKtmFieldsManual(ocrText);
-    return manual;
-  }
-
-  try {
-    const prompt = `Analyze this OCR text from an Indonesian university student ID card (KTM - Kartu Tanda Mahasiswa).
-
-Return ONLY a JSON object with these fields:
-{
-  "isValidKtm": true/false,
-  "studentName": "extracted name or null",
-  "nim": "student ID number (NIM/NPM) or null",
-  "university": "university name or null",
-  "major": "major/prodi or null",
-  "reason": "brief explanation"
-}
-
-isValidKtm = true if the text clearly shows a student card (has NIM, university name, "mahasiswa", "KTM", etc.).
-isValidKtm = false if it's NOT a student card (receipt, random document, selfie, etc.).
-
-OCR text:
-${ocrText}`;
-
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 500 },
-      }),
-    });
-
-    if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
-
-    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON in Gemini response");
-
-    const parsed = JSON.parse(jsonMatch[0]) as ExtractedFields;
-    return parsed;
-  } catch {
-    return extractKtmFieldsManual(ocrText);
   }
 }
 
