@@ -157,7 +157,7 @@ pub mod campusfi {
     ) -> Result<()> {
         let loan = &mut ctx.accounts.loan_request;
         require!(
-            loan.status == LoanStatus::Repaying as u8,
+            loan.status == LoanStatus::Active as u8 || loan.status == LoanStatus::Repaying as u8,
             CampusfiError::LoanNotRepayable
         );
 
