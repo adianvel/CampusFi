@@ -141,7 +141,9 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
     const name = verification.studentName || verification.email?.split("@")[0] || "Student";
     const university = verification.university || verification.universityDomain?.replace(".ac.id", "").toUpperCase() || "University";
     if (name.length > 2 && university.length > 2) {
-      runAction(() => registerStudent(name.slice(0, 64), university.slice(0, 64)));
+      registerStudent(name.slice(0, 64), university.slice(0, 64))
+        .then(() => refresh())
+        .catch(() => refresh());
     }
   }, [verification, studentProfile, connected]);
 
