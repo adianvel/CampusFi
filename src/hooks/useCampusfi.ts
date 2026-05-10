@@ -57,6 +57,9 @@ export function useCampusfi() {
     if (message.includes("Attempt to load a program that does not exist")) {
       return "CampusFi program is not deployed at the configured devnet program ID. Deploy the Anchor program or update VITE_PROGRAM_ID.";
     }
+    if (message.includes("LoanNotDisbursable")) {
+      return "This loan was already disbursed or is not in a disbursable state. Try refreshing the page.";
+    }
     if (message.includes("insufficient funds") || message.includes("custom program error: 0x1")) {
       return "Insufficient devnet USDC balance. Get test USDC for the lender wallet, then try again.";
     }
@@ -325,6 +328,12 @@ export function useCampusfi() {
 
         await refresh();
       } catch (err) {
+        // If loan is not disbursable (already disbursed or old loan), just refresh state
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("LoanNotDisbursable")) {
+          await refresh();
+          return;
+        }
         setError(normalizeError(err));
         throw err;
       } finally {

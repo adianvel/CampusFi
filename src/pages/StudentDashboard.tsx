@@ -780,15 +780,13 @@ function LoanCard({
   const repayDisabledReason =
     status === "Pending"
       ? `Loan must be fully funded before repayment. Current funding: ${formatUsdc(loan.fundedAmount).toFixed(2)} / ${formatUsdc(loan.amount).toFixed(2)} USDC.`
-      : status === "Active"
-        ? "Disburse the loan to your wallet first."
-        : status === "Completed"
-          ? "Loan is already completed."
-            : repayAmount.trim() === "" || parsedRepayAmount <= 0
-              ? "Enter a repay amount."
-            : parsedRepayAmount > remaining / 1_000_000
-              ? "Repay amount exceeds the remaining balance."
-              : pending
+      : status === "Completed"
+        ? "Loan is already completed."
+          : repayAmount.trim() === "" || parsedRepayAmount <= 0
+            ? "Enter a repay amount."
+          : parsedRepayAmount > remaining / 1_000_000
+            ? "Repay amount exceeds the remaining balance."
+            : pending
                 ? pending
                 : null;
   const repayButtonLabel =
