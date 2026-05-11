@@ -118,7 +118,7 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
             <select
               className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm"
               value={filters.riskTier}
-              onChange={(e) => setFilters({ ...filters, riskTier: e.target.value })}
+              onChange={(e) => setFilters((current) => ({ ...current, riskTier: e.target.value }))}
             >
               <option value="all">All tiers</option>
               <option value="0">Low Risk</option>
@@ -132,7 +132,7 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
               type="number"
               placeholder="50"
               value={filters.minAmount}
-              onChange={(e) => setFilters({ ...filters, minAmount: e.target.value })}
+              onChange={(e) => setFilters((current) => ({ ...current, minAmount: e.target.value }))}
               className="h-9"
             />
           </div>
@@ -142,7 +142,7 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
               type="number"
               placeholder="300"
               value={filters.maxAmount}
-              onChange={(e) => setFilters({ ...filters, maxAmount: e.target.value })}
+              onChange={(e) => setFilters((current) => ({ ...current, maxAmount: e.target.value }))}
               className="h-9"
             />
           </div>
@@ -151,7 +151,7 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
             <select
               className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm"
               value={filters.term}
-              onChange={(e) => setFilters({ ...filters, term: e.target.value })}
+              onChange={(e) => setFilters((current) => ({ ...current, term: e.target.value }))}
             >
               <option value="all">Any term</option>
               <option value="1">1 month</option>
@@ -231,14 +231,14 @@ export function LenderDashboard({ showMarketplace = false }: { showMarketplace?:
                     key={key}
                     loan={loan}
                     fundAmount={fundAmount}
-                    setFundAmount={(value) => setFundAmounts({ ...fundAmounts, [key]: value })}
+                    setFundAmount={(value) => setFundAmounts((current) => ({ ...current, [key]: value }))}
                     disabledReason={disabledReason}
                     pending={fundingKey === key}
                     onFund={() => {
                       setFundingKey(key);
                       runAction(async () => {
                         await fundLoan(loan, parsedFundAmount);
-                        setFundAmounts({ ...fundAmounts, [key]: "" });
+                        setFundAmounts((current) => ({ ...current, [key]: "" }));
                       }, `Successfully funded ${parsedFundAmount.toFixed(2)} USDC!`).finally(() => setFundingKey(null));
                     }}
                   />

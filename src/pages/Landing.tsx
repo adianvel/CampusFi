@@ -15,6 +15,8 @@ import campfiLogo from '../assets/logo-campfi.webp';
 import heroCampfi from '../assets/hero-campfi.webp';
 import togaCampfi from '../assets/toga-campfi.webp';
 
+const COPYRIGHT_YEAR = 2026;
+
 export function Landing() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -435,12 +437,12 @@ export function Landing() {
              <img src={campfiLogo} alt="CampusFi Logo" className="h-[80px] w-[80px] object-contain object-left" />
           </div>
           <p className="text-sm text-black">
-            &copy; {new Date().getFullYear()} CampusFi. All rights reserved.
+            &copy; {COPYRIGHT_YEAR} CampusFi. All rights reserved.
           </p>
-          <div className="flex gap-6 text-sm">
-            <a href="#" className="text-black hover:text-black/70 transition-colors">Twitter</a>
-            <a href="#" className="text-black hover:text-black/70 transition-colors">Discord</a>
-            <a href="#" className="text-black hover:text-black/70 transition-colors">Support</a>
+          <div className="flex gap-6 text-sm text-black">
+            <span>Twitter</span>
+            <span>Discord</span>
+            <span>Support</span>
           </div>
         </div>
       </footer>

@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type Dispatch, type FormEvent, type ReactNode, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { AlertCircle, CheckCircle2, FileText, IdCard, Loader2, RefreshCw, ScanLine, ShieldCheck, Upload, Zap } from "lucide-react";
 import { Alert, AlertDescription } from "@/src/components/ui/alert";
@@ -407,7 +407,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
                 <Field label="Purpose">
                   <Input
                     value={loanForm.purpose}
-                    onChange={(event) => setLoanForm({ ...loanForm, purpose: event.target.value })}
+                    onChange={(event) => setLoanForm((current) => ({ ...current, purpose: event.target.value }))}
                     className="h-10"
                   />
                 </Field>
@@ -418,7 +418,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
                       min={50}
                       max={300}
                       value={loanForm.amount}
-                      onChange={(event) => setLoanForm({ ...loanForm, amount: Number(event.target.value) })}
+                      onChange={(event) => setLoanForm((current) => ({ ...current, amount: Number(event.target.value) }))}
                       className="h-10"
                     />
                   </Field>
@@ -428,7 +428,7 @@ export function StudentDashboard({ showProfile = false }: { showProfile?: boolea
                       min={1}
                       max={6}
                       value={loanForm.termMonths}
-                      onChange={(event) => setLoanForm({ ...loanForm, termMonths: Number(event.target.value) })}
+                      onChange={(event) => setLoanForm((current) => ({ ...current, termMonths: Number(event.target.value) }))}
                       className="h-10"
                     />
                   </Field>
@@ -590,7 +590,10 @@ function StudentVerificationCard({
                 </button>
               </div>
             ) : (
-              <label className="flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed border-slate-300 p-6 transition-colors hover:border-blue-400 hover:bg-blue-50/50">
+              <label
+                aria-label="Upload KTM document"
+                className="flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed border-slate-300 p-6 transition-colors hover:border-blue-400 hover:bg-blue-50/50"
+              >
                 <div className="relative w-48 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
                   <div className="mb-2 flex items-center gap-2 border-b border-slate-100 pb-2">
                     <div className="h-3 w-3 rounded-sm bg-blue-500" />
@@ -624,7 +627,7 @@ function StudentVerificationCard({
 
           <Button type="submit" className="w-full" disabled={pending || !ktmFile} aria-busy={pending}>
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-            {pending ? "Verifying..." : "Verify KTM"}
+            {pending ? "Verifying…" : "Verify KTM"}
           </Button>
 
           <p className="text-xs text-slate-500">
@@ -683,7 +686,7 @@ function RegisterStudentCard({
   verification,
 }: {
   profileForm: { name: string; university: string };
-  setProfileForm: (value: { name: string; university: string }) => void;
+  setProfileForm: Dispatch<SetStateAction<{ name: string; university: string }>>;
   pending: string | null;
   onSubmit: () => void;
   verification: StudentVerification | null;
@@ -707,14 +710,14 @@ function RegisterStudentCard({
             <Label className="text-sm font-medium text-[#111827]">Name</Label>
             {nameFromKtm && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">from KTM</span>}
           </div>
-          <Input value={profileForm.name} onChange={(event) => setProfileForm({ ...profileForm, name: event.target.value })} className="h-10" />
+          <Input value={profileForm.name} onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))} className="h-10" />
         </div>
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Label className="text-sm font-medium text-[#111827]">University</Label>
             {uniFromKtm && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">from KTM</span>}
           </div>
-          <Input value={profileForm.university} onChange={(event) => setProfileForm({ ...profileForm, university: event.target.value })} className="h-10" />
+          <Input value={profileForm.university} onChange={(event) => setProfileForm((current) => ({ ...current, university: event.target.value }))} className="h-10" />
         </div>
         <Button disabled={Boolean(pending)} onClick={onSubmit}>
           {pending === "Registering student profile" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

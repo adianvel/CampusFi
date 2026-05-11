@@ -14,6 +14,7 @@ import campfiLogo from "@/src/assets/logo-campfi.webp";
 
 export function AppDashboard() {
   const location = useLocation();
+  const { pathname } = location;
   const { publicKey } = useWallet();
   const [searchParams] = useSearchParams();
   const locationState = location.state as { role?: "student" | "lender" } | null;
@@ -69,10 +70,10 @@ export function AppDashboard() {
   }, [publicKey, role]);
 
   useEffect(() => {
-    if (location.pathname === "/app") {
+    if (pathname === "/app") {
       setNotice(null);
     }
-  }, [location.pathname]);
+  }, [pathname]);
 
   if (!role) {
     return <Navigate to="/onboarding" replace />;
@@ -89,7 +90,7 @@ export function AppDashboard() {
       <aside className="w-full border-b bg-card text-card-foreground md:w-72 md:border-b-0 md:border-r md:flex md:flex-col md:h-screen md:sticky md:top-0">
         <div className="h-20 flex items-center px-6 border-b shrink-0">
           <Link to="/" className="flex items-center gap-2">
-            <div className="h-11 w-11 overflow-hidden rounded-xl bg-black shadow-sm">
+            <div className="size-11 overflow-hidden rounded-xl bg-background shadow-sm">
               <img src={campfiLogo} alt="CampusFi logo" className="h-full w-full object-cover" />
             </div>
             <div>
@@ -111,7 +112,7 @@ export function AppDashboard() {
             </CardContent>
           </Card>
 
-          <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-2 px-2 mt-4 font-mono">Platform</div>
+          <div className="mb-2 mt-4 px-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">Platform</div>
           {role === "student" ? (
             <>
               <NavItem to="/app/profile" icon={<UserCircle2 className="h-4 w-4" />} label="Reputation Profile" />
@@ -150,7 +151,7 @@ export function AppDashboard() {
           
           <div className="flex items-center gap-3">
             <WalletStatus />
-            <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold shadow-sm">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold shadow-sm">
                {role === "student" ? "S" : "L"}
             </div>
           </div>
@@ -167,7 +168,7 @@ export function AppDashboard() {
              <Route path="/" element={role === "student" ? <StudentDashboard /> : <LenderDashboard />} />
              <Route path="/profile" element={role === "student" ? <StudentDashboard showProfile /> : <LenderDashboard />} />
              <Route path="/marketplace" element={role === "lender" ? <LenderDashboard showMarketplace /> : <StudentDashboard />} />
-             <Route path="*" element={<div className="text-slate-500">Page not found or not mapped in demo</div>} />
+             <Route path="*" element={<div className="text-muted-foreground">Page not found or not mapped in demo</div>} />
            </Routes>
         </div>
       </main>
@@ -217,7 +218,7 @@ function NavItem({
   const navigate = useNavigate();
   const isActive = location.pathname === to;
 
-  function handleClick(event: React.MouseEvent<HTMLAnchorElement>) {
+  function handleNavigation(event: React.MouseEvent<HTMLAnchorElement>) {
     if (!requiresStudentVerification) return;
 
     if (isStudentVerified) return;
@@ -230,7 +231,7 @@ function NavItem({
   return (
     <Link 
       to={to} 
-      onClick={handleClick}
+      onClick={handleNavigation}
       className={`flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 transition-colors text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         isActive 
         ? "bg-primary text-primary-foreground shadow-sm" 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { Copy, ExternalLink, Loader2, Wallet } from "lucide-react";
@@ -15,11 +15,34 @@ function getExplorerUrl(address: string) {
   return `https://explorer.solana.com/address/${address}${clusterParam}`;
 }
 
+type BalanceState = {
+  balance: number | null;
+  error: string | null;
+};
+
+type BalanceAction =
+  | { type: "reset" }
+  | { type: "loading" }
+  | { type: "loaded"; balance: number }
+  | { type: "failed"; error: string };
+
+function balanceReducer(_state: BalanceState, action: BalanceAction): BalanceState {
+  switch (action.type) {
+    case "reset":
+      return { balance: null, error: null };
+    case "loading":
+      return { balance: null, error: null };
+    case "loaded":
+      return { balance: action.balance, error: null };
+    case "failed":
+      return { balance: null, error: action.error };
+  }
+}
+
 export function WalletStatus() {
   const { connection } = useConnection();
   const { publicKey, connected, connecting } = useWallet();
-  const [balance, setBalance] = useState<number | null>(null);
-  const [balanceError, setBalanceError] = useState<string | null>(null);
+  const [balanceState, dispatchBalance] = useReducer(balanceReducer, { balance: null, error: null });
   const [copied, setCopied] = useState(false);
 
   const address = publicKey?.toBase58();
@@ -33,17 +56,16 @@ export function WalletStatus() {
 
     async function loadBalance() {
       if (!publicKey) {
-        setBalance(null);
-        setBalanceError(null);
+        dispatchBalance({ type: "reset" });
         return;
       }
 
-      setBalanceError(null);
+      dispatchBalance({ type: "loading" });
       try {
         const lamports = await connection.getBalance(publicKey);
-        if (!cancelled) setBalance(lamports / 1_000_000_000);
+        if (!cancelled) dispatchBalance({ type: "loaded", balance: lamports / 1_000_000_000 });
       } catch {
-        if (!cancelled) setBalanceError("Balance unavailable");
+        if (!cancelled) dispatchBalance({ type: "failed", error: "Balance unavailable" });
       }
     }
 
@@ -74,22 +96,22 @@ export function WalletStatus() {
   return (
     <div className="flex items-center gap-3">
 
-      <div className="hidden lg:flex items-center gap-2 rounded-sm border border-slate-200 bg-white px-3 py-2">
-        <span className="h-2 w-2 rounded-full bg-[#3B82F6]" aria-hidden />
-        <Wallet className="h-3.5 w-3.5 text-[#3B82F6]" aria-hidden />
-        <span className="font-mono text-xs tabular-nums text-slate-800">
+      <div className="hidden items-center gap-2 rounded-sm border bg-card px-3 py-2 lg:flex">
+        <span className="size-2 rounded-full bg-primary" aria-hidden />
+        <Wallet className="size-3.5 text-primary" aria-hidden />
+        <span className="font-mono text-xs tabular-nums text-foreground">
           {shortAddress}
         </span>
-        <span className="h-4 w-px bg-slate-200" aria-hidden />
-        <span className="font-mono text-xs tabular-nums text-slate-500">
-          {balanceError ? (
-            balanceError
-          ) : balance === null ? (
+        <span className="h-4 w-px bg-border" aria-hidden />
+        <span className="font-mono text-xs tabular-nums text-muted-foreground">
+          {balanceState.error ? (
+            balanceState.error
+          ) : balanceState.balance === null ? (
             <span className="inline-flex items-center gap-1">
-              <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> SOL
+              <Loader2 className="size-3 animate-spin" aria-hidden /> SOL
             </span>
           ) : (
-            `${balance.toFixed(3)} SOL`
+            `${balanceState.balance.toFixed(3)} SOL`
           )}
         </span>
       </div>
@@ -102,7 +124,7 @@ export function WalletStatus() {
         aria-label={copied ? "Address copied" : "Copy wallet address"}
         title={copied ? "Copied" : "Copy address"}
       >
-        <Copy className="h-4 w-4" aria-hidden />
+        <Copy className="size-4" aria-hidden />
       </Button>
 
       {address && (
@@ -112,9 +134,9 @@ export function WalletStatus() {
           rel="noreferrer"
           aria-label="View wallet on Solana Explorer"
           title="View on explorer"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-sm border border-slate-300 text-[#111827] transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B82F6] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F8FAFC]"
+          className="inline-flex size-10 items-center justify-center rounded-sm border text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          <ExternalLink className="h-4 w-4" aria-hidden />
+          <ExternalLink className="size-4" aria-hidden />
         </a>
       )}
 
